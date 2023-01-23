@@ -1,14 +1,13 @@
 import os
 from pathlib import Path
+pepfile: "pep/config.yaml"
 configfile: "config.yaml"
 # from snakemake.shell import shell
 # shell.executable('/bin/zsh')
 
-#samples = ['SRR6515351', 'SRR6515354']
-samples = ['3TC1', '3TC2', '3TC3', 'CAS1', 'CAS2', 'CAS3', 'FTC1', 'FTC2', 'FTC3', 'KREB1', 'KREB2', 'KREB3', 'NT1', 'NT2', 'NT3', 'PRO1', 'PRO2', 'PRO3', 'QUI1', 'QUI2', 'QUI3']
-NT = ['NT1', 'NT2', 'NT3']
-PRO = ['PRO1', 'PRO2', 'PRO3']
 
+#samples = ['SRR6515351', 'SRR6515354']
+samples = pep.sample_table.sample_name
 
 rule all:
     input:
@@ -154,8 +153,8 @@ rule fastqdump:
         outdir = "rawdata/{sample}"
     log: "logs/{sample}/fastqdump.log"
     output:
-        r1 = temp("rawdata/{sample}/{sample}_1.fastq"),
-        r2 = temp("rawdata/{sample}/{sample}_2.fastq")
+        r1 = temp("rawdata/{sample}_1.fastq"),
+        r2 = temp("rawdata/{sample}_2.fastq")
     conda:
         "envs/deeptools.yml"
     shell: "fastq-dump --split-files --outdir {params.outdir} {input} 2> {log}"
@@ -577,7 +576,7 @@ rule mergeTElocal:
         telocalUNIQUE = expand("outs/{sample}/TElocal/{sample}_UNIQUE.cntTable", sample = samples)
 
     params:
-        sampleinfo = config["sampleinfo"]
+        sampleinfo = config["sample_table"]
     conda: "envs/renv.yml"
     log: "logs/agg/mergeTElocal.log"
     output:
@@ -677,7 +676,8 @@ rule repeatanalysis:
     params:
         contrasts = config["contrasts"],
         telocaltypes = config["telocaltypes"],
-        repeats = config["repeats"]
+        sample_table = config["sample_table"],
+        repeats = config["repeats"],
         inputdir = "results/agg/deseq2",
         outputdir = "results/agg/repeatanalysis"
     conda:

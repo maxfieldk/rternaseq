@@ -21,7 +21,7 @@ for (counttype in counttypes) {
     cts = select(cts, -Geneid)
     cnames = colnames(cts)
 
-    coldata = read.csv(snakemake@params[["sampleinfo"]])
+    coldata = read.csv(snakemake@params[["sample_table"]])
 
     contrasts = snakemake@params[["contrasts"]]
 
@@ -31,7 +31,7 @@ for (counttype in counttypes) {
     ###
 
     condition = coldata$condition
-    colnames(cts) <- coldata$sample
+    colnames(cts) <- coldata$sample_name
     dds <- DESeqDataSetFromMatrix(countData = cts,
                                 colData = coldata,
                                 design= ~ condition)
