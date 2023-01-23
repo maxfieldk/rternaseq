@@ -4,6 +4,7 @@ configfile: "config.yaml"
 # from snakemake.shell import shell
 # shell.executable('/bin/zsh')
 
+
 #samples = ['SRR6515351', 'SRR6515354']
 samples = ['3TC1', '3TC2', '3TC3', 'CAS1', 'CAS2', 'CAS3', 'FTC1', 'FTC2', 'FTC3', 'KREB1', 'KREB2', 'KREB3', 'NT1', 'NT2', 'NT3', 'PRO1', 'PRO2', 'PRO3', 'QUI1', 'QUI2', 'QUI3']
 NT = ['NT1', 'NT2', 'NT3']
