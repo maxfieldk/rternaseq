@@ -9,6 +9,7 @@ library("pheatmap")
 library("ggplot2")
 library('tibble')
 library("RColorBrewer")
+library("cowplot")
 
 ### inputs
 
@@ -49,10 +50,11 @@ for (counttype in counttypes) {
     sampleDists <- dist(t(assay(vsd)))
 
     pdf(paste(outputdir,counttype,"plots","pcaplot.pdf", sep = '/'), width=10, height=8)
-    plotPCA(vsd, intgroup=c("condition"))
+    print(plotPCA(vsd, intgroup=c("condition")) + theme_cowplot())
     dev.off()
 
 
+    plotPCA(vsd, intgroup=c("condition")) 
 
     sampleDistMatrix <- as.matrix(sampleDists)
     rownames(sampleDistMatrix) <- paste(vsd$condition, vsd$type, sep="-")

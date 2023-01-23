@@ -1,3 +1,4 @@
+#note! there are dataset specific parameters set! need to edit accordingly
 log <- file(snakemake@log[[1]], open="wt")
 sink(log)
 
@@ -8,17 +9,33 @@ library('tibble')
 library("RColorBrewer")
 library("magrittr")
 library("cowplot")
-for (contrast in snakemake@params[["contrasts"]]) {
-    typesen = ifelse("condition_lsen_vs_prol" == contrast, "late", "early")
+library("eulerr")
+library("ggVennDiagram")
+library('Gviz')
+library('rtracklayer')
+library('trackViewer')
+library("org.Hs.eg.db")
 
-    ddsres = read.csv(paste(snakemake@params[["inputdir"]], contrast, "results.csv", sep = "/"))
-    ddscounts = read.csv(paste(snakemake@params[["inputdir"]], contrast, "counttable.csv", sep = "/"))
-    ddsrlogcounts = read.csv(paste(snakemake@params[["inputdir"]], contrast, "rlogcounts.csv", sep = "/"))
-    outputdir = snakemake@params[["outputdir"]]
+
+save.image()
+
+for (counttype in snakemake@params[["telocaltypes"]]) {
+
+for (contrast in snakemake@params[["contrasts"]]) {
+    contrast_to = unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
+    ddsres = read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
+    ddscounts = read.csv(paste(snakemake@params[["inputdir"]], counttype,  contrast, "counttable.csv", sep = "/"))
+    ddsrlogcounts = read.csv(paste(snakemake@params[["inputdir"]], counttype,  contrast, "rlogcounts.csv", sep = "/"))
+    outputdir = paste(snakemake@params[["outputdir"]], counttype, sep = "/")
 
     colnames(ddsres)[1] <- "Geneid"
     colnames(ddscounts)[1] <- "Geneid"
     colnames(ddsrlogcounts)[1] <- "Geneid"
+
+    for (treatment in treatments) {
+    
+    
+    }
 
     ddsrlogcounts = ddsrlogcounts %>% mutate(rlogprolmean = ((SRR6515349 +SRR6515350 +SRR6515351)/3), rlogesenmean = ((SRR6515352 +SRR6515353 +SRR6515354)/3), rloglsenmean = ((SRR6515355 +SRR6515356 +SRR6515357)/3) )
     ddscounts = ddscounts %>% mutate(prolmean = ((SRR6515349 +SRR6515350 +SRR6515351)/3), esenmean = ((SRR6515352 +SRR6515353 +SRR6515354)/3), lsenmean = ((SRR6515355 +SRR6515356 +SRR6515357)/3) )
@@ -27,6 +44,8 @@ for (contrast in snakemake@params[["contrasts"]]) {
     rlogsub = ddsrlogcounts[,c('Geneid','rlogprolmean','rlogesenmean','rloglsenmean')]
     log2sub = ddscounts[,c('Geneid','prolmean','esenmean','lsenmean','log2prolmean','log2esenmean','log2lsenmean')]
     dflist = list(ddsres, rlogsub,log2sub)
+
+
     results = Reduce(function(x, y) merge(x, y, by="Geneid"), dflist, accumulate=FALSE)
 
     results = results %>% mutate(Significance = ifelse(padj < 0.05, ifelse(padj < 0.001, "< 0.001", "< 0.05"), "> 0.05"))
@@ -47,8 +66,9 @@ for (contrast in snakemake@params[["contrasts"]]) {
     results[matches,"ActiveTE"] = "AluY"
     matches = grep("HERVK", genes)
     results[matches,"ActiveTE"] = "HERVK"
-    matches = grep("L1HS:L1", genes)
 
+
+    matches = grep("L1HS:L1", genes)
     l1 = results[matches,] %>% ggplot() +
         geom_point(aes(x = rlogprolmean, y = rloglsenmean, color = Significance)) +
         geom_abline(intercept = 0)+ 
@@ -59,7 +79,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         ggtitle("L1HS") +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
     matches = grep("AluY:Alu", genes)
@@ -73,7 +93,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
     matches = grep("HERVK", genes)
@@ -87,7 +107,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
     agg = results %>% ggplot() +
         geom_violin(aes(x = ActiveTE, y = log2FoldChange), draw_quantiles = c(0.5)) +
@@ -129,7 +149,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         ggtitle("L1") +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
     matches = grep("Alu:SINE", genes) %>% sample(1000,replace=FALSE)
@@ -143,7 +163,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
     matches = grep("ERV.:LTR", genes) %>% sample(1000,replace=FALSE)
@@ -157,7 +177,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
     agg = results %>% ggplot() +
         geom_violin(aes(x = Family, y = log2FoldChange), draw_quantiles = c(0.5)) +
@@ -199,7 +219,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         ggtitle("L1HS") +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
     matches = grep("AluY:Alu", genes)
@@ -213,10 +233,10 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
-    matches = grep("HERVK", genes)
+    matches = grep("HERVK(.)*int", genes)
     hervk = results[matches,] %>% ggplot() +
         geom_point(aes(x = rlogprolmean, y = rloglsenmean, color = Significance)) +
         geom_abline(intercept = 0)+ 
@@ -227,7 +247,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
     aggactive = results %>% ggplot() +
         geom_violin(aes(x = ActiveTE, y = log2FoldChange), draw_quantiles = c(0.5)) +
@@ -258,7 +278,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         ggtitle("L1") +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
     matches = grep("Alu:SINE", genes) %>% sample(1000,replace=FALSE)
@@ -272,7 +292,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
 
     matches = grep("ERV.:LTR", genes) %>% sample(1000,replace=FALSE)
@@ -286,7 +306,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
         theme_cowplot() +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line=element_blank()) +
-        labs(x ="rlog counts proliferating", y= paste("rlog counts", typesen, "senescent", sep = ' '))
+        labs(x ="rlog counts proliferating", y= paste("rlog counts", contrast_to, "senescent", sep = ' '))
 
     agg = results %>% ggplot() +
         geom_violin(aes(x = Family, y = log2FoldChange), draw_quantiles = c(0.5)) +
@@ -322,12 +342,124 @@ for (contrast in snakemake@params[["contrasts"]]) {
     # options(repr.plot.width = 30, repr.plot.height = 10)
 
 }
-x <- data.frame()
-write.table(x, file=snakemake@output[['outfile']], col.names=FALSE)
-
 
 # Note on p-values set to NA: some values in the results table can be set to NA for one of the following reasons:
 
 # If within a row, all samples have zero counts, the baseMean column will be zero, and the log2 fold change estimates, p value and adjusted p value will all be set to NA.
 # If a row contains a sample with an extreme count outlier then the p value and adjusted p value will be set to NA. These outlier counts are detected by Cook’s distance. Customization of this outlier filtering and description of functionality for replacement of outlier counts and refitting is described below
 # If a row is filtered by automatic independent filtering, for having a low mean normalized count, then only the adjusted p value will be set to NA. Description and customization of independent filtering is described below
+
+
+#################### Venn diagrams
+
+esenprol = read.csv(paste(snakemake@params[["inputdir"]], snakemake@params[["contrasts"]][1] , "results.csv", sep = "/"))
+lsenprol = read.csv(paste(snakemake@params[["inputdir"]], snakemake@params[["contrasts"]][2] , "results.csv", sep = "/"))
+colnames(esenprol)[1] <- "Geneid"
+colnames(lsenprol)[1] <- "Geneid"
+
+
+esenprolUP = esenprol[esenprol$pvalue < 0.05 & esenprol$log2FoldChange > 0, 'Geneid'] %>% na.omit()
+esenprolDOWN = esenprol[esenprol$pvalue < 0.05 & esenprol$log2FoldChange < 0, 'Geneid'] %>% na.omit()
+
+lsenprolUP = lsenprol[lsenprol$pvalue < 0.05 & lsenprol$log2FoldChange > 0, 'Geneid'] %>% na.omit()
+lsenprolDOWN = lsenprol[lsenprol$pvalue < 0.05 & lsenprol$log2FoldChange < 0, 'Geneid'] %>% na.omit()
+
+UP = list(esenprolUP = esenprolUP, lsenprolUP=lsenprolUP)
+DOWN = list(esenprolDOWN = esenprolDOWN, lsenprolDOWN=lsenprolDOWN)
+
+
+fit <- euler(UP, shape = "ellipse")
+upplot = plot(fit, fill = c("tan1", "steelblue1"),
+     quantities = TRUE,
+     labels = list(font = 4))
+
+fit <- euler(DOWN, shape = "ellipse")
+downplot = plot(fit, fill = c("tan1", "steelblue1"),
+     quantities = TRUE,
+     labels = list(font = 4))
+     
+plots = list(upplot, downplot)
+
+grid = plot_grid(plotlist = plots, labels = c("UP", "DOWN"), ncol = 1)
+grid
+pdf(paste(outputdir, paste0("VennDiagram", "allDEGS", ".pdf"), sep = '/'), width=4, height=6)
+print(grid)
+dev.off()
+
+
+####################
+contrasts = list(esenprol= esenprol, lsenprol = lsenprol)
+pattern = c("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int")
+names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int")
+plots = list()
+for (e in pattern) {
+    l = list()
+    for (i in seq(length(contrasts))) {
+        name = names(contrasts[i])
+        matches = grep(e, contrasts[[i]]$Geneid)
+        searched_element = contrasts[[i]][matches,]
+        sigsearched = list(searched_element[searched_element$padj < 0.05, 'Geneid'] %>% na.omit())  
+        names(sigsearched) <- name
+        str(sigsearched)
+        
+        l = c(l, sigsearched)
+    }    
+    str(l)
+    fit <- euler(l, shape = "ellipse")
+    p = plot(fit, fill = c("tan1", "steelblue1"),
+        quantities = TRUE,
+        labels = list(font = 4),
+        main = e)
+    pdf(paste(outputdir, paste0("VennDiagram", e, ".pdf"), sep = '/'), width=14, height=8)
+    print(p)
+    dev.off()
+
+    p_no_title = plot(fit, fill = c("tan1", "steelblue1"),
+    quantities = TRUE,
+    labels = list(font = 4))
+
+    plots = c(plots, list(p_no_title))
+}
+
+grid = plot_grid(plotlist = plots,
+  labels = names(pattern), ncol = 3)
+pdf(paste(outputdir, paste0("VennDiagram", "RTEs", ".pdf"), sep = '/'), width=9, height=6)
+print(grid)
+dev.off()
+
+}
+
+##############
+
+x <- data.frame()
+write.table(x, file=snakemake@output[['outfile']], col.names=FALSE)
+
+#############
+
+
+####################
+repeats = snakemake@params[["repeats"]]
+repmasker = read_delim(repeats, col_names=FALSE) %>% mutate_at(c('X2', 'X3'), as.numeric) %>% mutate(length = X3-X2)
+
+
+pattern = c("LINE/L1", "SINE/Alu", "LTR/ERVK", "L1HS", "AluY", "HERVK(.)*int")
+names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int")
+activeLengthReq = c(1,0,0,6000,290,7000)
+maxlength = c(7000, 400, 15000,7000, 400, 15000 )
+colors = c("deeppink4", "deepskyblue4", "darkorange4", "deeppink1", "deepskyblue1", "darkorange1")
+
+plots = list()
+
+for (i in seq(length(pattern))) {
+print(i)
+print(pattern[i])
+p = repmasker %>% filter(length < maxlength[i]) %>%  filter( grepl(pattern[i], X4)) %>% ggplot() +
+geom_histogram(aes(x=length), fill = colors[i]) + theme_cowplot()
+plots = c(plots, list(p))
+}
+head(repmasker)
+
+grid = plot_grid(plotlist = plots, labels = names(pattern))
+pdf(paste(outputdir, paste0("histogram", "allRTEs", ".pdf"), sep = '/'), width=10, height=6)
+print(grid)
+dev.off()

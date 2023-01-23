@@ -1,10 +1,3 @@
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager",repos = "http://cran.us.r-project.org")
-BiocManager::install("org.Hs.eg.db") #org.Mm.eg.db for mouse
-
-# if (!require("BiocManager", quietly = TRUE))
-#     install.packages("BiocManager")
-# BiocManager::install("AnnotationDbi")
 log <- file(snakemake@log[[1]], open="wt")
 sink(log)
 
@@ -14,8 +7,13 @@ library(clusterProfiler)
 library(enrichplot)
 library(AnnotationDbi)
 library(stringr)
-library(ggplot2)
+library(stringr)
 library(cowplot)
+library(pathview)
+library(ggplot2)
+
+
+basedir = getwd()
 for (contrast in snakemake@params[["contrasts"]]) {
 
     res = read.csv(paste(snakemake@params[["inputdir"]], contrast, "results.csv", sep = "/"))
@@ -42,6 +40,11 @@ for (contrast in snakemake@params[["contrasts"]]) {
     ### Enrichment analysis
     degUP <- rownames(res[((res$padj < 0.05)&(res$log2FoldChange > 0.5)),])
     degDOWN <- rownames(res[((res$padj < 0.05)&(res$log2FoldChange < 0.5)),])
+    deg <- rownames(res[((res$padj < 0.05)&(abs(res$log2FoldChange) > 0.5)),])
+
+
+
+
     top100degs = head(res[order(res$padj),], 100)
     allgenes <- rownames(res)
     oraUP = enricher(degUP, TERM2GENE=custom_go2gene, universe=allgenes)
@@ -147,9 +150,30 @@ for (contrast in snakemake@params[["contrasts"]]) {
     print(emapplot(gse, color = "enrichmentScore", showCategory = 20, layout = "nicely")+ ggtitle(paste("GSEA", contrast, sep=' ')))
     dev.off()
 
-x <- data.frame()
-write.table(x, file=snakemake@output[['outfile']], col.names=FALSE)
 
+    #### KEGG
+    eg = bitr(deg, fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+    kk <- enrichKEGG(gene  = eg$ENTREZID,
+                    organism = 'hsa',
+                    pvalueCutoff = 0.05)
 
+    pdf(paste(outputdir, contrast, "KEGG", paste0("barplot", ".pdf"), sep = '/'), width=7, height=6)
+    print(barplot(kk, showCategory = 20)+ ggtitle(paste("KEGG", 'all DEGs', contrast, sep=' ')))
+    dev.off()
 
+    pdf(paste(outputdir, contrast, "KEGG", paste0("dotplot", ".pdf"), sep = '/'), width=7, height=6)
+    print(dotplot(kk, showCategory = 20)+ ggtitle(paste("KEGG", 'all DEGs', contrast, sep=' ')))
+    dev.off()
+
+    eg = bitr(rownames(res), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+    named_foldchange <- setNames(res$log2FoldChange, eg$ENTREZID)
+    setwd(paste(outputdir, contrast, "KEGG", sep = '/'))
+    for (e in head(kk$ID, 20)) {
+        pathview(gene.data  = named_foldchange,pathway.id = e,species="hsa", gene.idtype ="entrez", limit = 10)
+    }
+    setwd(basedir)
+
+    x <- data.frame()
+    write.table(x, file=snakemake@output[['outfile']], col.names=FALSE)
 }
+save.image()
