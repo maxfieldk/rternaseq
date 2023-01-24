@@ -1,10 +1,12 @@
 import os
 from pathlib import Path
-pepfile: "pep/config.yaml"
 configfile: "config.yaml"
+pepfile: "conf/project_config.yaml"
+
 # from snakemake.shell import shell
 # shell.executable('/bin/zsh')
 
+container: "docker://maxfieldkelsey/snakesenescence"
 
 #samples = ['SRR6515351', 'SRR6515354']
 samples = pep.sample_table.sample_name
@@ -163,7 +165,7 @@ rule TrimReads:
     input:
         r1 = "rawdata/{sample}_R1.fastq.gz",
         r2 = "rawdata/{sample}_R2.fastq.gz"
-    threads: 6
+    threads: 4
     log: "logs/{sample}/TrimReads.log"
     output:
         r1 = "rawdata/{sample}_1.trimmed.fastq.gz",
@@ -186,7 +188,7 @@ rule AlignBowtie2:
     log:
         out = "logs/{sample}/bowtie2.out",
         err = "logs/{sample}/bowtie2.err"
-    threads: 8
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell:
@@ -204,7 +206,7 @@ rule alignSTAR:
     log:
         out = "logs/{sample}/STAR.out",
         err = "logs/{sample}/STAR.err"
-    threads: 8
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell:
@@ -350,7 +352,7 @@ rule multiBamSummary:
         bam = expand("outs/{a}/{a}.sorted.bam", a=samples)
     output:
         agg = "results/agg/multiBamSummary.npz"
-    threads: 8
+    threads: 4
     log: "logs/multiBamSummary.log"
     conda:
         "envs/deeptools.yml"
@@ -383,14 +385,12 @@ rule TElocal:
     output:
         countsMULTI = "outs/{sample}/TElocal/{sample}_MULTI.cntTable",
         countsUNIQUE = "outs/{sample}/TElocal/{sample}_UNIQUE.cntTable"
-    threads: 6
-    conda:
-        "envs/deeptools.yml"
+    threads: 4
     shell: 
-    """
+        """
 TElocal --sortByPos -b {input.sortedSTARbam} --GTF {params.refseq} --TE {params.locindTElocal} --project {params.outputprefixMULTI} 2> {log}
 TElocal --sortByPos -b {input.sortedSTARbam} --GTF {params.refseq} --TE {params.locindTElocal} --mode uniq --project {params.outputprefixUNIQUE} 2>> {log}
-    """
+        """
 
 
 rule featureCounts:
@@ -405,7 +405,7 @@ rule featureCounts:
     log: "logs/agg/featureCounts.log"
     conda:
         "envs/deeptools.yml"
-    threads: 8
+    threads: 4
     shell: 
         """
 featureCounts -p -T {threads} -t exon -a {params.gtf} -o {output.countsmessy} {input.sortedSTARbams} 2> {log}
@@ -592,7 +592,7 @@ rule DEseq2:
         telocal_MULTI = "outs/agg/TElocalCounts_MULTI.txt",
         telocal_UNIQUE = "outs/agg/TElocalCounts_UNIQUE.txt",
     params:
-        sampleinfo = config["sampleinfo"],
+        sample_table = config["sample_table"],
         contrasts = config["contrasts"],
         counttypes = config["counttypes"],
         levels = config["levels"],

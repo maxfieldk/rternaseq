@@ -51,12 +51,13 @@ for (contrast in snakemake@params[["contrasts"]]) {
         for (e in condition_samples) {
             if (s == '') {
                 s = e
-            } else {
+            } else { 
                 s = paste0(s, "+", e )
             }
         }
         s = paste0("(", s, ")", "/", length(condition_samples))
         meancol = paste0(condition, "mean")
+        #could have done a groupby call here to avoid building the string e.g. groupby condition %>% {{meancol}} :=
         ddscounts = ddscounts %>% mutate({{meancol}} := eval(parse(text=s)))
         log2meancol = paste0("log2",condition, "mean")
         ddscounts = ddscounts %>% mutate({{log2meancol}} := log2(.data[[meancol]]) )
