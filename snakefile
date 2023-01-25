@@ -7,7 +7,8 @@ pepfile: "conf/project_config.yaml"
 
 
 
-container: "docker://maxfieldkelsey/snakesenescence"
+
+container: "docker://maxfieldkelsey/snakesenescence:latest"
 
 samples = pep.sample_table.sample_name
 
@@ -214,9 +215,7 @@ rule alignSTAR:
     log:
         out = "logs/{sample}/STAR.out",
         err = "logs/{sample}/STAR.err"
-    threads: 2
-    conda:
-        "envs/deeptools.yml"
+    threads: 10
     shell:
         """
 STAR --genomeDir {params.index} --readFilesCommand zcat --readFilesIn {input.r1} {input.r2} --outFileNamePrefix {params.outdir} --runThreadN {threads} --winAnchorMultimapNmax 100 --outFilterMultimapNmax 100 > {log.out} 2> {log.err}
@@ -228,7 +227,7 @@ rule sortSTARbams:
     output:
         sortedbamSTAR = "outs/{sample}/star_output/{sample}.STAR.sorted.bam"
     log: "logs/{sample}/sortSTARbams.log"
-    threads: 2
+    threads: 6
     conda:
         "envs/deeptools.yml"
     shell: "samtools sort {input.bamSTAR} -o {output.sortedbamSTAR} 2> {log}"
@@ -239,7 +238,7 @@ rule indexsortedSTARbam:
     log: "logs/{sample}/indexsortedSTARbam.log"
     output:
         sortedbamSTARindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
-    threads: 2
+    threads: 6
     conda:
         "envs/deeptools.yml"
     shell: "samtools index {input.sortedbamSTAR} 2> {log}"
@@ -393,7 +392,7 @@ rule TElocal:
     output:
         countsMULTI = "outs/{sample}/TElocal/{sample}_MULTI.cntTable",
         countsUNIQUE = "outs/{sample}/TElocal/{sample}_UNIQUE.cntTable"
-    threads: 2
+    threads: 7
     shell: 
         """
 TElocal --sortByPos -b {input.sortedSTARbam} --GTF {params.refseq} --TE {params.locindTElocal} --project {params.outputprefixMULTI} 2> {log}
