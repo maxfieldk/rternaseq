@@ -6,7 +6,7 @@ pepfile: "conf/project_config.yaml"
 # from snakemake.shell import shell
 # shell.executable('/bin/zsh')
 
-container: "docker://maxfieldkelsey/snakesenescence"
+container: "docker://maxfieldkelsey/snakesenescence:latest"
 
 #samples = ['SRR6515351', 'SRR6515354']
 samples = pep.sample_table.sample_name
@@ -206,7 +206,7 @@ rule alignSTAR:
     log:
         out = "logs/{sample}/STAR.out",
         err = "logs/{sample}/STAR.err"
-    threads: 4
+    threads: 8
     conda:
         "envs/deeptools.yml"
     shell:
@@ -385,7 +385,7 @@ rule TElocal:
     output:
         countsMULTI = "outs/{sample}/TElocal/{sample}_MULTI.cntTable",
         countsUNIQUE = "outs/{sample}/TElocal/{sample}_UNIQUE.cntTable"
-    threads: 4
+    threads: 6
     shell: 
         """
 TElocal --sortByPos -b {input.sortedSTARbam} --GTF {params.refseq} --TE {params.locindTElocal} --project {params.outputprefixMULTI} 2> {log}
