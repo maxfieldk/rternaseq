@@ -9,6 +9,7 @@
 !/scripts
 
 !/templates
+!/tools
 
 !snakefile
 !Dockerfile
