@@ -50,6 +50,10 @@ if True:
     if not os.path.exists(path):
         os.makedirs(path)
 
+    path = 'templates'
+    if not os.path.exists(path):
+        os.makedirs(path)
+
     path = 'tools'
     if not os.path.exists(path):
         os.makedirs(path)
