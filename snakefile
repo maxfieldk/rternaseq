@@ -723,7 +723,13 @@ make_tracks_file --trackFiles \
 -o {params.outputdir}/atracks.ini 2> {log}
 
 #modify tracks ini file to show labels
-sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD.ini
+#I set the max height for all rna tracks to 50
+sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD1.ini
+sed 's/#overlay_previous = yes/overlay_previous = share-y/g' {params.outputdir}/atracksMOD1.ini > {params.outputdir}/atracksMOD2.ini
+sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD2.ini > {params.outputdir}/atracksMOD3.ini
+sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD3.ini > {params.outputdir}/atracksMOD4.ini
+sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > {params.outputdir}/atracksMOD.ini
+
 
 #manually modify tracks to show labels
 cat {params.l1hs6kbintactbed} | while read line
