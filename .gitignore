@@ -8,11 +8,10 @@
 # do not ignore (needed due to the above bullet point)
 !/scripts
 
-!/conftemplate
+!/templates
 
 !snakefile
 !Dockerfile
-!configtemplate.yml
 
 
 
