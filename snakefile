@@ -20,6 +20,7 @@ snakemake \
     --dry-run
 '''
 
+
 import os
 from pathlib import Path
 configfile: "config.yaml"

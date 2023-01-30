@@ -4,13 +4,14 @@
 !.gitignore
 
 
+
 # do not ignore (needed due to the above bullet point)
 !/scripts
 
-!/conf
+!/templates
 
 !snakefile
-
+!Dockerfile
 
 
 

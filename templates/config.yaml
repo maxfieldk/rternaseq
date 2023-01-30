@@ -1,0 +1,61 @@
+sample_table: "conf/sample_table.csv"
+
+#tools
+trimmomaticdir: tools/Trimmomatic-0.39
+
+#indeces
+locindTElocal: "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd"
+bowtie2hs1index: "/users/mkelsey/data/ref/genomes/hs1/hs1.sorted_bowtie2/hs1"
+starindex: "/users/mkelsey/data/ref/genomes/hs1/STARindex"
+
+#annotations
+refseq: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.110.20220412.ncbiRefSeqUCSCstyle.gtf"
+repeats: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1_RepeatMasker.sorted"
+repeatsbed: "/users/mkelsey/data/ref/genomes/hs1/annotations/repeatmasker.bed"
+l1hs6kb: "/users/mkelsey/data/ref/genomes/hs1/annotations/L1HS6kb"
+aluY: "/users/mkelsey/data/ref/genomes/hs1/annotations/aluY"
+HERVK: "/users/mkelsey/data/ref/genomes/hs1/annotations/HERVK"
+l1hs6kbintact: "/users/mkelsey/data/ref/genomes/hs1/annotations/L1HS6kbintact"
+l1hs6kbintactbed: "/users/mkelsey/data/ref/genomes/hs1/annotations/L1HS6kbintact.bed5"
+SenMayoHuman: "/users/mkelsey/data/ref/genesets/SenMayoGeneSetHuman.txt"
+
+genelistsforplot:
+  - "/users/mkelsey/data/ref/genesets/sasp.txt"
+
+#for illumina truseq stranded, "2" for feature counts; "reverse" for telocal
+featureCountsstrandparam: "2"
+telocalstrandparam: "reverse"
+
+#order matters for levels! first is the base comparator
+levels:
+  - "PRO"
+  - "QUI"
+  - "SEN"
+  - "3TC"
+  - "FTC"
+  - "CAS"
+  - "KREB"
+
+#mappings
+levelslegendmap:
+  PRO: "proliferating"
+  QUI: "quiescent"
+  SEN: "senescent"
+  3TC: "3TC"
+  FTC: "FTC"
+  CAS: "CAS"
+  KREB: "KREB"
+
+#analysis settings
+contrasts:
+  - "condition_SEN_vs_PRO"
+  - "condition_QUI_vs_PRO"
+counttypes:
+  - "star"
+  - "telocal_multi"
+  - "telocal_uniq"
+telocaltypes:
+  - "telocal_multi"
+  - "telocal_uniq"
+
+
