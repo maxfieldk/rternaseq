@@ -1,20 +1,41 @@
-from snakemake.shell import shell
-shell.executable('/usr/bin/bash')
+'''
+snakemake \
+    --use-conda \
+    --rerun-triggers mtime \
+    --use-singularity \
+    --singularity-args "--bind /users/mkelsey/data" \
+    --keep-going \
+    --rerun-incomplete  \
+    --latency-wait 30 \
+    --jobs 20 \
+    --default-resources mem_mb=30000 disk_mb=200000 \
+    --cluster '
+        sbatch \
+        -e slurm/slurm-%j.err \
+        -o slurm/slurm-%j.out \
+        --partition batch \
+        --cpus-per-task {threads} \
+        --mem {resources.mem_mb} \
+        --time 5:00:00' \
+    --dry-run
+'''
+
 import os
 from pathlib import Path
 configfile: "config.yaml"
 pepfile: "conf/project_config.yaml"
 
-
-
+# from snakemake.shell import shell
+# shell.executable('/bin/zsh')
 
 container: "docker://maxfieldkelsey/snakesenescence:latest"
 
+#samples = ['SRR6515351', 'SRR6515354']
 samples = pep.sample_table.sample_name
 
 rule all:
     input:
-        results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"])
+        expand("allplotsDONE{sample}.txt", sample = samples)        
         
 
 
@@ -24,6 +45,14 @@ rule all:
 
 ########################################################### Make folders
 if True:
+    path = 'slurm'
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    path = 'tools'
+    if not os.path.exists(path):
+        os.makedirs(path)
+
     if not os.path.exists('envs'):
         os.makedirs('envs')
     if not os.path.exists('temp'):
@@ -45,16 +74,16 @@ if True:
     if not os.path.exists(path):
         os.makedirs(path)
 
-        for telocaltype in config["telocaltypes"]:
-            path = "results/agg/repeatanalysis/%s"%(telocaltype)
+    for counttype in config["counttypes"]:
+        path = "results/agg/repeatanalysis/%s"%(counttype)
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    for counttype in config["counttypes"]:
+        for contrast in config["contrasts"]:
+            path = 'results/agg/repeatanalysis/%s/%s'%(counttype,contrast)
             if not os.path.exists(path):
                 os.makedirs(path)
-
-        for telocaltype in config["telocaltypes"]:
-            for contrast in config["contrasts"]:
-                path = 'results/agg/repeatanalysis/%s/%s'%(telocaltype,contrast)
-                if not os.path.exists(path):
-                    os.makedirs(path)
 
     for counttype in config["counttypes"]:
         if not os.path.exists('results/agg/deseq2/%s'%(counttype)):
@@ -69,9 +98,16 @@ if True:
     if not os.path.exists('results/agg/clusterprofiler'):
         os.makedirs('results/agg/clusterprofiler')
 
+    if not os.path.exists('results/agg/clusterprofiler/genes'):
+        os.makedirs('results/agg/clusterprofiler/genes')
+
     for contrast in config["contrasts"]:
         if not os.path.exists('results/agg/clusterprofiler/%s'%(contrast)):
             os.makedirs('results/agg/clusterprofiler/%s'%(contrast))
+
+    for contrast in config["contrasts"]:
+        if not os.path.exists('results/agg/clusterprofiler/%s/genes'%(contrast)):
+            os.makedirs('results/agg/clusterprofiler/%s/genes'%(contrast))
 
     for contrast in config["contrasts"]:
         path = 'results/agg/clusterprofiler/%s/gsea'%(contrast)
@@ -87,6 +123,19 @@ if True:
             path = 'results/agg/clusterprofiler/%s/KEGG'%(contrast)
             if not os.path.exists(path):
                 os.makedirs(path)
+
+        for contrast in config["contrasts"]:
+            path = 'results/agg/clusterprofiler/%s/KEGG/topsigpathways'%(contrast)
+            if not os.path.exists(path):
+                os.makedirs(path)
+
+        for contrast in config["contrasts"]:
+            path = 'results/agg/clusterprofiler/%s/KEGG/importantpathways'%(contrast)
+            if not os.path.exists(path):
+                os.makedirs(path)
+
+
+
 
     if not os.path.exists('results/agg/plots'):
         os.makedirs('results/agg/plots')
@@ -140,14 +189,14 @@ if True:
 rule prefetch:
     output:
         sra = temp("rawdata/{sample}/{sample}.sra")
-    threads: 2
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell: "prefetch {wildcards.sample} --output-directory rawdata"
 
 rule fastqdump:
     input: "rawdata/{sample}/{sample}.sra"
-    threads: 2
+    threads: 4
     params:
         outdir = "rawdata/{sample}"
     log: "logs/{sample}/fastqdump.log"
@@ -160,8 +209,8 @@ rule fastqdump:
 
 rule TrimReads:
     input:
-        r1 = "rawdata/{sample}_R1_001.fastq.gz",
-        r2 = "rawdata/{sample}_R2_001.fastq.gz"
+        r1 = "rawdata/{sample}_R1.fastq.gz",
+        r2 = "rawdata/{sample}_R2.fastq.gz"
     params:
         trimmomaticdir = config["trimmomaticdir"]
     threads: 2
@@ -186,6 +235,7 @@ ILLUMINACLIP:{params.trimmomaticdir}/adapters/TruSeq3-PE.fa:2:30:10:8:true \
 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 \
 2> {log}
         """
+
 rule AlignBowtie2:
     input:
         r1 = "rawdata/{sample}_1.trimmed.fastq.gz",
@@ -197,7 +247,7 @@ rule AlignBowtie2:
     log:
         out = "logs/{sample}/bowtie2.out",
         err = "logs/{sample}/bowtie2.err"
-    threads: 2
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell:
@@ -215,7 +265,9 @@ rule alignSTAR:
     log:
         out = "logs/{sample}/STAR.out",
         err = "logs/{sample}/STAR.err"
-    threads: 10
+    threads: 8
+    conda:
+        "envs/deeptools.yml"
     shell:
         """
 STAR --genomeDir {params.index} --readFilesCommand zcat --readFilesIn {input.r1} {input.r2} --outFileNamePrefix {params.outdir} --runThreadN {threads} --winAnchorMultimapNmax 100 --outFilterMultimapNmax 100 > {log.out} 2> {log.err}
@@ -227,7 +279,7 @@ rule sortSTARbams:
     output:
         sortedbamSTAR = "outs/{sample}/star_output/{sample}.STAR.sorted.bam"
     log: "logs/{sample}/sortSTARbams.log"
-    threads: 6
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell: "samtools sort {input.bamSTAR} -o {output.sortedbamSTAR} 2> {log}"
@@ -238,7 +290,7 @@ rule indexsortedSTARbam:
     log: "logs/{sample}/indexsortedSTARbam.log"
     output:
         sortedbamSTARindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
-    threads: 6
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell: "samtools index {input.sortedbamSTAR} 2> {log}"
@@ -248,8 +300,8 @@ rule samtobam:
     input:
         sam = "outs/{sample}/{sample}.sam"
     output:
-        bam = pipe("outs/{sample}/{sample}.bam")
-    threads: 2
+        bam = temp("outs/{sample}/{sample}.bam")
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell:
@@ -260,7 +312,7 @@ rule sortbams:
         bam = "outs/{sample}/{sample}.bam"
     output:
         sortedbam = "outs/{sample}/{sample}.sorted.bam"
-    threads: 2
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell: "samtools sort {input.bam} -o {output.sortedbam}"
@@ -271,7 +323,7 @@ rule indexsortedbam:
     log: "logs/{sample}/indexsortedbam.log"
     output:
         bamindex = "outs/{sample}/{sample}.sorted.bam.bai"
-    threads: 2
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell: "samtools index {input.sortedbam} 2> {log}"
@@ -281,7 +333,7 @@ rule bamstats:
         bam = "outs/{sample}/{sample}.sorted.bam"
     output:
         bamstats = "outs/{sample}/{sample}.bam.sorted.stats.txt"
-    threads: 2
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell:
@@ -298,7 +350,7 @@ rule repeatCounts:
     log: "logs/{sample}/repeatCounts.log"
     output:
         repeatcounts = "outs/{sample}/{sample}.repeatmasker.counts"
-    threads: 2
+    threads: 4
     conda:
         "envs/deeptools.yml"
     shell:
@@ -318,7 +370,7 @@ rule getnormalizedCounts:
     input:
         repeatcounts = "outs/{sample}/{sample}.repeatmasker.counts",
         mnma = "outs/{sample}/{sample}_number_nonmito_mapped_per_million.txt"
-    threads: 2
+    threads: 4
     output:
         repeatcounts = "results/{sample}/{sample}.repeatmasker.countsPerMillionNonMito"
     log: "logs/{sample}/getnormalizedCounts.log"
@@ -332,7 +384,7 @@ rule getnormalizedCounts:
 rule getnormalizedFamilyCounts:
     input:
         counts = "results/{sample}/{sample}.repeatmasker.countsPerMillionNonMito"
-    threads: 2
+    threads: 4
     output:
         l1 = "results/{sample}/{sample}.l1.counts.txt",
         l1hs = "results/{sample}/{sample}.l1hs.counts.txt",
@@ -359,7 +411,7 @@ rule multiBamSummary:
         bam = expand("outs/{a}/{a}.sorted.bam", a=samples)
     output:
         agg = "results/agg/multiBamSummary.npz"
-    threads: 2
+    threads: 4
     log: "logs/multiBamSummary.log"
     conda:
         "envs/deeptools.yml"
@@ -379,24 +431,25 @@ rule plotbamPCA:
 #######################################################################
 #Get counts via several methods
 #######################################################################
+#note that maptype must be either uniq or multi
 rule TElocal:
     input:
         sortedSTARbam = "outs/{sample}/star_output/{sample}.STAR.sorted.bam",
         sortedbamSTARindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
-    log: "logs/{sample}/TElocal.log"
+    log: "logs/{sample}/TElocal_{maptype}.log"
     params:
         refseq = config["refseq"],
         locindTElocal = config["locindTElocal"],
-        outputprefixMULTI = "outs/{sample}/TElocal/{sample}_MULTI",
-        outputprefixUNIQUE = "outs/{sample}/TElocal/{sample}_UNIQUE"
+        telocalstrandparam = config['telocalstrandparam'],
+        outputprefix = "outs/{sample}/TElocal/{sample}_{maptype}",
     output:
-        countsMULTI = "outs/{sample}/TElocal/{sample}_MULTI.cntTable",
-        countsUNIQUE = "outs/{sample}/TElocal/{sample}_UNIQUE.cntTable"
-    threads: 7
+        counts = "outs/{sample}/TElocal/{sample}_{maptype}.cntTable",
+    threads: 4
+    resources:
+        mem_mb  = 40000
     shell: 
         """
-TElocal --sortByPos -b {input.sortedSTARbam} --GTF {params.refseq} --TE {params.locindTElocal} --project {params.outputprefixMULTI} 2> {log}
-TElocal --sortByPos -b {input.sortedSTARbam} --GTF {params.refseq} --TE {params.locindTElocal} --mode uniq --project {params.outputprefixUNIQUE} 2>> {log}
+TElocal --sortByPos -b {input.sortedSTARbam} --stranded {params.telocalstrandparam} --mode {wildcards.maptype} --GTF {params.refseq} --TE {params.locindTElocal} --project {params.outputprefix} 2> {log}
         """
 
 
@@ -408,16 +461,17 @@ rule featureCounts:
         counts = "outs/agg/refseq.counts.txt",
         metafeaturecounts = "outs/agg/refseq.metafeature.counts.txt"
     params: 
-        gtf = config['refseq']
+        gtf = config['refseq'],
+        featureCountsstrandparam = config['featureCountsstrandparam']
     log: "logs/agg/featureCounts.log"
     conda:
         "envs/deeptools.yml"
-    threads: 2
+    threads: 4
     shell: 
         """
-featureCounts -p -T {threads} -t exon -a {params.gtf} -o {output.countsmessy} {input.sortedSTARbams} 2> {log}
+featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -t exon -a {params.gtf} -o {output.countsmessy} {input.sortedSTARbams} 2> {log}
 cut -f1,7- {output.countsmessy} | awk 'NR > 1' > {output.counts}
-featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
+featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
         """
 #######################################################################
 # deeptools plots
@@ -425,7 +479,8 @@ featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts
 
 rule deeptools_coverage:
     input:
-        bam = "outs/{sample}/{sample}.sorted.bam"
+        bam = "outs/{sample}/star_output/{sample}.STAR.sorted.bam",
+        bamindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
     conda:
         "envs/deeptools.yml"
     output:
@@ -434,16 +489,18 @@ rule deeptools_coverage:
 
 rule deeptools_plotcoverage:
     input:
-        bam = "outs/{sample}/{sample}.sorted.bam"
+        bam = "outs/{sample}/star_output/{sample}.STAR.sorted.bam"
+    log:
+        "logs/{sample}/deeptools_plotcoverage.log"
     params:
         l1hs6kb = config["l1hs6kb"],
         l1hs6kbintact = config["l1hs6kbintact"],
     conda:
         "envs/deeptools.yml"
     output:
-        genomecoverageplot = "results/{sample}/plots/coverageGenome",
-        l1hscoverageplot = "results/{sample}/plots/coverageL1HS",
-        l1hsintactcoverageplot = "results/{sample}/plots/coverageL1HSintact"
+        genomecoverageplot = "results/{sample}/plots/coverageGenome.pdf",
+        l1hscoverageplot = "results/{sample}/plots/coverageL1HS.pdf",
+        l1hsintactcoverageplot = "results/{sample}/plots/coverageL1HSintact.pdf"
     shell:
         """
 plotCoverage -b {input.bam} \
@@ -451,7 +508,7 @@ plotCoverage -b {input.bam} \
 -n 1000000 \
 --plotTitle "Whole Genome Coverage" \
 --ignoreDuplicates \
---minMappingQuality 10
+--minMappingQuality 10 2> {log}
 
 plotCoverage -b {input.bam} \
 --BED {params.l1hs6kb} \
@@ -459,7 +516,7 @@ plotCoverage -b {input.bam} \
 -n 1000000 \
 --plotTitle "L1HS Coverage" \
 --ignoreDuplicates \
---minMappingQuality 10
+--minMappingQuality 10 2>> {log}
 
 plotCoverage -b {input.bam} \
 --BED {params.l1hs6kbintact} \
@@ -467,14 +524,14 @@ plotCoverage -b {input.bam} \
 -n 1000000 \
 --plotTitle "L1HS Coverage" \
 --ignoreDuplicates \
---minMappingQuality 10
+--minMappingQuality 10 2>> {log}
         """
 
 
 
 rule deeptools_plotAggcoverage:
     input:
-        coverage = "outs/{sample}/coverage.bw"
+        coverage = "outs/{sample}/{sample}_cov.bw"
     params:
         l1hs6kb = config["l1hs6kb"],
         l1hs6kbintact = config["l1hs6kbintact"]
@@ -579,16 +636,13 @@ computeMatrix reference-point \
 #######################################################################
 rule mergeTElocal:
     input:
-        telocalMULTI = expand("outs/{sample}/TElocal/{sample}_MULTI.cntTable", sample = samples),
-        telocalUNIQUE = expand("outs/{sample}/TElocal/{sample}_UNIQUE.cntTable", sample = samples)
-
+        telocal = expand("outs/{sample}/TElocal/{sample}_{{maptype}}.cntTable", sample = samples)
     params:
-        sampleinfo = config["sample_table"]
+        sample_table = config["sample_table"]
     conda: "envs/renv.yml"
-    log: "logs/agg/mergeTElocal.log"
+    log: "logs/agg/mergeTElocal_{maptype}.log"
     output:
-        aggcountsMULTI = "outs/agg/TElocalCounts_MULTI.txt",
-        aggcountsUNIQUE = "outs/agg/TElocalCounts_UNIQUE.txt"
+        aggcounts = "outs/agg/TElocalCounts_{maptype}.txt",
     script:
         "scripts/mergeTEdf.R"
 
@@ -596,8 +650,8 @@ rule mergeTElocal:
 rule DEseq2:
     input:
         star = "outs/agg/refseq.counts.txt",
-        telocal_MULTI = "outs/agg/TElocalCounts_MULTI.txt",
-        telocal_UNIQUE = "outs/agg/TElocalCounts_UNIQUE.txt",
+        telocal_multi = "outs/agg/TElocalCounts_multi.txt",
+        telocal_uniq = "outs/agg/TElocalCounts_uniq.txt",
     params:
         sample_table = config["sample_table"],
         contrasts = config["contrasts"],
@@ -607,17 +661,22 @@ rule DEseq2:
     conda: "envs/renv.yml"
     log: "logs/agg/DEseq2.log"
     output:
-        results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"])
+        results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
+        outfile = "results/agg/deseq2/outfile.txt"
     script:
         "scripts/DESeq2.R"
 
 rule clusterprofiler:
     input:
-        deresults = expand("results/agg/deseq2/star/{contrast}/results.csv", contrast = config["contrasts"])
+        deresults = expand("results/agg/deseq2/star/{contrast}/results.csv", contrast = config["contrasts"]),
+        normcounttable = expand("results/agg/deseq2/star/{contrast}/counttablesizenormed.csv", contrast = config["contrasts"])
     params:
         contrasts = config["contrasts"],
+        genelistsforplot = config["genelistsforplot"],
         SenMayoHuman = config["SenMayoHuman"],
+        sample_table = config["sample_table"],
         inputdir = "results/agg/deseq2/star",
+        levels = config["levels"],
         outputdir = "results/agg/clusterprofiler"
     conda:
         "envs/Rclusterprofiler.yml"
@@ -682,7 +741,9 @@ rule repeatanalysis:
         expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"])
     params:
         contrasts = config["contrasts"],
+        counttypes = config["counttypes"],
         telocaltypes = config["telocaltypes"],
+        levelslegendmap = config["levelslegendmap"],
         sample_table = config["sample_table"],
         repeats = config["repeats"],
         inputdir = "results/agg/deseq2",
@@ -810,3 +871,15 @@ computeMatrix reference-point \
 #  --kmeans 3 \
 #  --samplesLabel "L1Hs6kb Coverage" \
 
+rule allplots:
+    input:
+        bamstats = "outs/{sample}/{sample}.bam.sorted.stats.txt",
+        l1hsintactcoverageplot = "results/{sample}/plots/coverageL1HSintact.pdf",
+        matrix = "outs/{sample}/matrix_l1hs6kb_coverage.tab.gz",
+        matrixl1hs = "outs/agg/matrix_l1hs6kb_coverage.tab.gz",
+        outfile3 = "results/agg/clusterprofiler/outfile.txt",
+        outfile = "results/agg/repeatanalysis/genometracks/outfile.txt",
+        outfile2 = "results/agg/repeatanalysis/outfile.txt",
+        des2 = "results/agg/deseq2/outfile.txt"
+    output:
+        "allplotsDONE{sample}.txt"

@@ -11,9 +11,12 @@ library('tibble')
 library("RColorBrewer")
 library("cowplot")
 
+save.image()
+
 ### inputs
 
 counttypes = snakemake@params[["counttypes"]]
+counttype = 'star'
 for (counttype in counttypes) {
     print(counttype)
     cts = read.delim(snakemake@input[[counttype]])
@@ -35,8 +38,8 @@ for (counttype in counttypes) {
     dds <- DESeqDataSetFromMatrix(countData = cts,
                                 colData = coldata,
                                 design= ~ condition)
-    keep <- rowSums(counts(dds)) >= 10
-    dds <- dds[keep,]
+    # keep <- rowSums(counts(dds)) >= 10
+    # dds <- dds[keep,]
     #this sets prol as the reference level since its first in the vector
     dds$condition <- factor(dds$condition, levels = levels)
 
@@ -52,9 +55,6 @@ for (counttype in counttypes) {
     pdf(paste(outputdir,counttype,"plots","pcaplot.pdf", sep = '/'), width=10, height=8)
     print(plotPCA(vsd, intgroup=c("condition")) + theme_cowplot())
     dev.off()
-
-
-    plotPCA(vsd, intgroup=c("condition")) 
 
     sampleDistMatrix <- as.matrix(sampleDists)
     rownames(sampleDistMatrix) <- paste(vsd$condition, vsd$type, sep="-")
@@ -96,3 +96,6 @@ for (counttype in counttypes) {
     }
 
 }
+
+x <- data.frame()
+write.table(x, file=snakemake@output[['outfile']], col.names=FALSE)

@@ -7,10 +7,16 @@ library(clusterProfiler)
 library(enrichplot)
 library(AnnotationDbi)
 library(stringr)
-library(stringr)
 library(cowplot)
 library(pathview)
 library(ggplot2)
+library(tibble)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggbeeswarm)
+
+save.image()
 
 
 basedir = getwd()
@@ -167,13 +173,125 @@ for (contrast in snakemake@params[["contrasts"]]) {
 
     eg = bitr(rownames(res), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
     named_foldchange <- setNames(res$log2FoldChange, eg$ENTREZID)
-    setwd(paste(outputdir, contrast, "KEGG", sep = '/'))
+    setwd(paste(outputdir, contrast, "KEGG", "topsigpathways", sep = '/'))
     for (e in head(kk$ID, 20)) {
         pathview(gene.data  = named_foldchange,pathway.id = e,species="hsa", gene.idtype ="entrez", limit = 10)
     }
     setwd(basedir)
+    setwd(paste(outputdir, contrast, "KEGG", "importantpathways", sep = '/'))
+    my_fav_kegg_pathways = c(tlr="04620", cgas="04623", rlr="04622", senescence="04218")
+    for (e in my_fav_kegg_pathways) {
+        pathview(gene.data  = named_foldchange,pathway.id = e,species="hsa", gene.idtype ="entrez", limit = 10)
+    }
 
-    x <- data.frame()
-    write.table(x, file=snakemake@output[['outfile']], col.names=FALSE)
+    setwd(basedir)
+
 }
-save.image()
+
+########################################## plotting individual genes
+sample_table = read_csv(snakemake@params[["sample_table"]])
+#sample_table = read_csv("/users/mkelsey/data/senescence/conf/sample_table.csv")
+sample_name = sample_table$sample_name
+condition = sample_table$condition
+named_list = list()
+for (i in seq(length(sample_name))) {
+    print(i)
+    named_list[[ sample_name[[i]] ]] = condition[[i]]
+    i = i+1
+}
+
+counts = read_csv(snakemake@input[["normcounttable"]][1])
+#counts = read_csv("/users/mkelsey/data/senescence/results/agg/deseq2/star/condition_SEN_vs_PRO/counttablesizenormed.csv")
+levels = snakemake@params[["levels"]]
+# levels = c(
+#       "PRO",
+#   "QUI",
+#   "SEN",
+#   "3TC",
+#   "FTC",
+#   "CAS",
+#   "KREB"
+# )
+counts = counts %>% pivot_longer(cols= -1) %>% pivot_wider(names_from = "...1",values_from = "value")
+counts = counts %>% plyr::rename(c("name" = "sample"))
+counts = counts %>% mutate(condition= unname(unlist(named_list[sample])))
+
+genelists = snakemake@params[["genelistsforplot"]]
+
+for (genelistname in genelists) {
+    browser()
+    genelist = read_csv(genelistname, col_names = FALSE)
+    genelist = genelist$X1
+    #genelist = c("IL1A", "IL6", "IFNA1", "IGFBP3", "CGAS")
+    plots = list()
+    for (gene in genelist) {
+        if (gene %in% colnames(counts)) {      
+            #first create a grouped summary for the bar plot
+            gd <- counts %>% 
+                    group_by(condition) %>% 
+                    summarise(
+                    {{gene}} := mean(.data[[gene]]),
+                    )
+            #make the plot
+            p_no_title = counts %>% ggplot() + 
+                geom_col(data = gd, aes(x = factor(condition, level=levels), y = .data[[gene]], fill = factor(condition, level=levels))) + 
+                geom_point(aes(x = factor(condition, level=levels), y = .data[[gene]]), position = position_dodge2(width = 0.2)) +
+                theme_cowplot() + 
+                theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+                xlab("") + theme(legend.position = "none")
+            #pdf(paste(outputdir, "genes", paste0(gene, ".pdf"), sep = '/'), width=4, height=4)
+            pdf("zbplot.pdf", width=4, height=4)
+            print(p_no_title)
+            dev.off()
+            #add to plot list
+            plots = c(plots, list(p_no_title))
+        }
+
+    }
+
+    grid = plot_grid(plotlist = plots, labels = "AUTO", ncol = 3)
+    pdf(paste(outputdir, "genes", paste0(genelistname, ".pdf"), sep = '/'), width=9, height=6)
+    print(grid)
+    dev.off()
+
+
+    #now make a limited version of plot with fewer categories
+    for (contrast in snakemake@params[["contrasts"]]) {
+        split = str_split(contrast, "_")
+        treatment = split[[1]][2]
+        base = split[[1]][4]
+
+        plots_fewer_cat = list()
+        for (gene in genelist) {
+            if (gene %in% colnames(counts)) {      
+                #first create a grouped summary for the bar plot
+                gd <- counts %>% 
+                    filter(condition %in% c(base, treatment)) %>% group_by(condition) %>%
+                    summarise(
+                    {{gene}} := mean(.data[[gene]]),
+                    )
+                p_no_title = counts %>% filter(condition %in% c(base, treatment)) %>% ggplot() + 
+                    geom_col(data = gd, aes(x = factor(condition, level=levels), y = .data[[gene]], fill = factor(condition, level=levels))) + 
+                    geom_point(aes(x = factor(condition, level=levels), y = .data[[gene]]), position = position_dodge2(width = 0.2)) + 
+                    theme_cowplot() + 
+                    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+                    xlab("") + 
+                    guides(fill = FALSE)
+                pdf(paste(outputdir, contrast, "genes", paste0(gene, ".pdf"), sep = '/'), width=3, height=3)
+                print(p_no_title)
+                dev.off()
+                plots_fewer_cat = c(plots_fewer_cat, list(p_no_title))
+            }
+        }
+        grid = plot_grid(plotlist = plots_fewer_cat, labels = "AUTO", ncol = 3)
+        pdf(paste(outputdir, contrast, "genes", paste0(genelistname, ".pdf"), sep = '/'), width=9, height=6)
+        print(grid)
+        dev.off()
+    }
+
+}
+
+x <- data.frame()
+write.table(x, file=snakemake@output[['outfile']], col.names=FALSE)
+
+
