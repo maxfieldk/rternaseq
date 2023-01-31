@@ -126,7 +126,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
     }
 
     ### GSE Analysis
-    res <- res[order(-res$stat),]
+    res <- res[order(-res$stat),] %>% drop_na()
     ordered_gene_list <- res$stat
     names(ordered_gene_list) <- rownames(res)
     gse = GSEA(ordered_gene_list, TERM2GENE=custom_go2gene, eps = 0)
@@ -177,6 +177,7 @@ for (contrast in snakemake@params[["contrasts"]]) {
     for (e in head(kk$ID, 20)) {
         pathview(gene.data  = named_foldchange,pathway.id = e,species="hsa", gene.idtype ="entrez", limit = 10)
     }
+
     setwd(basedir)
     setwd(paste(outputdir, contrast, "KEGG", "importantpathways", sep = '/'))
     my_fav_kegg_pathways = c(tlr="04620", cgas="04623", rlr="04622", senescence="04218")
@@ -219,7 +220,6 @@ counts = counts %>% mutate(condition= unname(unlist(named_list[sample])))
 genelists = snakemake@params[["genelistsforplot"]]
 
 for (genelistname in genelists) {
-    browser()
     genelist = read_csv(genelistname, col_names = FALSE)
     genelist = genelist$X1
     #genelist = c("IL1A", "IL6", "IFNA1", "IGFBP3", "CGAS")
@@ -250,14 +250,14 @@ for (genelistname in genelists) {
     }
 
     grid = plot_grid(plotlist = plots, labels = "AUTO", ncol = 3)
-    pdf(paste(outputdir, "genes", paste0(genelistname, ".pdf"), sep = '/'), width=9, height=6)
+    pdf(paste(outputdir, "genes", paste0(stringr::str_split(basename(genelistname),"\\.")[[1]][1], ".pdf"), sep = '/'), width=9, height=6)
     print(grid)
     dev.off()
 
 
     #now make a limited version of plot with fewer categories
     for (contrast in snakemake@params[["contrasts"]]) {
-        split = str_split(contrast, "_")
+        split = stringr::str_split(contrast, "_")
         treatment = split[[1]][2]
         base = split[[1]][4]
 
@@ -284,7 +284,7 @@ for (genelistname in genelists) {
             }
         }
         grid = plot_grid(plotlist = plots_fewer_cat, labels = "AUTO", ncol = 3)
-        pdf(paste(outputdir, contrast, "genes", paste0(genelistname, ".pdf"), sep = '/'), width=9, height=6)
+        pdf(paste(outputdir, contrast, "genes", paste0(stringr::str_split(basename(genelistname),"\\.")[[1]][1], ".pdf"), sep = '/'), width=9, height=6)
         print(grid)
         dev.off()
     }

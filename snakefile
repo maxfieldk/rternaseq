@@ -34,6 +34,7 @@ container: "docker://maxfieldkelsey/snakesenescence:latest"
 
 #samples = ['SRR6515351', 'SRR6515354']
 samples = pep.sample_table.sample_name
+peptable = pep.sample_table
 
 rule all:
     input:
@@ -213,10 +214,13 @@ rule fastqdump:
         "envs/deeptools.yml"
     shell: "fastq-dump --split-files --outdir {params.outdir} {input} 2> {log}"
 
+        
 rule TrimReads:
     input:
-        r1 = "rawdata/{sample}_R1.fastq.gz",
-        r2 = "rawdata/{sample}_R2.fastq.gz"
+        r1=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R1"],
+        r2=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R2"]
+        # r1 = "rawdata/{sample}_1.fastq.gz",
+        # r2 = "rawdata/{sample}_2.fastq.gz"
     params:
         trimmomaticdir = config["trimmomaticdir"]
     threads: 2
@@ -272,6 +276,8 @@ rule alignSTAR:
         out = "logs/{sample}/STAR.out",
         err = "logs/{sample}/STAR.err"
     threads: 8
+    resources:
+        mem_mb  = 60000
     conda:
         "envs/deeptools.yml"
     shell:
