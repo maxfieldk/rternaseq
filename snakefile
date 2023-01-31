@@ -34,6 +34,7 @@ container: "docker://maxfieldkelsey/snakesenescence:latest"
 
 #samples = ['SRR6515351', 'SRR6515354']
 samples = pep.sample_table.sample_name
+peptable = pep.sample_table
 
 rule all:
     input:
@@ -213,10 +214,13 @@ rule fastqdump:
         "envs/deeptools.yml"
     shell: "fastq-dump --split-files --outdir {params.outdir} {input} 2> {log}"
 
+        
 rule TrimReads:
     input:
-        r1 = "rawdata/{sample}_R1.fastq.gz",
-        r2 = "rawdata/{sample}_R2.fastq.gz"
+        r1=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R1"],
+        r2=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R2"]
+        # r1 = "rawdata/{sample}_1.fastq.gz",
+        # r2 = "rawdata/{sample}_2.fastq.gz"
     params:
         trimmomaticdir = config["trimmomaticdir"]
     threads: 2
@@ -272,6 +276,8 @@ rule alignSTAR:
         out = "logs/{sample}/STAR.out",
         err = "logs/{sample}/STAR.err"
     threads: 8
+    resources:
+        mem_mb  = 60000
     conda:
         "envs/deeptools.yml"
     shell:
@@ -724,7 +730,13 @@ make_tracks_file --trackFiles \
 -o {params.outputdir}/atracks.ini 2> {log}
 
 #modify tracks ini file to show labels
-sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD.ini
+#I set the max height for all rna tracks to 50
+sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD1.ini
+sed 's/#overlay_previous = yes/overlay_previous = share-y/g' {params.outputdir}/atracksMOD1.ini > {params.outputdir}/atracksMOD2.ini
+sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD2.ini > {params.outputdir}/atracksMOD3.ini
+sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD3.ini > {params.outputdir}/atracksMOD4.ini
+sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > {params.outputdir}/atracksMOD.ini
+
 
 #manually modify tracks to show labels
 cat {params.l1hs6kbintactbed} | while read line
