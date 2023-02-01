@@ -471,6 +471,8 @@ rule featureCounts:
     output:
         countsmessy = "outs/agg/refseq.counts_messy.txt",
         counts = "outs/agg/refseq.counts.txt",
+        countsstrandnonspecificmessy = "outs/agg/refseq.countsstrandnonspecific_messy.txt",
+        countsstrandnonspecific = "outs/agg/refseq.countsstrandnonspecific.txt",
         metafeaturecounts = "outs/agg/refseq.metafeature.counts.txt"
     params: 
         gtf = config['refseq'],
@@ -483,7 +485,9 @@ rule featureCounts:
         """
 featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -t exon -a {params.gtf} -o {output.countsmessy} {input.sortedSTARbams} 2> {log}
 cut -f1,7- {output.countsmessy} | awk 'NR > 1' > {output.counts}
-featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
+featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -B -O -a {params.gtf} -o {output.countsstrandnonspecificmessy} {input.sortedSTARbams} 2>> {log}
+cut -f1,7- {output.countsstrandnonspecificmessy} | awk 'NR > 1' > {output.countsstrandnonspecific}
+featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
         """
 #######################################################################
 # deeptools plots

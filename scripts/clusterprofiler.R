@@ -208,7 +208,7 @@ levels = snakemake@params[["levels"]]
 #       "PRO",
 #   "QUI",
 #   "SEN",
-#   "3TC",
+#   "X3TC",
 #   "FTC",
 #   "CAS",
 #   "KREB"

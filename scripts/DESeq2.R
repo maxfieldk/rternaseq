@@ -2,6 +2,7 @@ log <- file(snakemake@log[[1]], open="wt")
 sink(log)
 
 
+
 library('DESeq2')
 library('readr')
 library('dplyr')
@@ -12,7 +13,6 @@ library("RColorBrewer")
 library("cowplot")
 library("PCAtools")
 
-save.image()
 
 ### inputs
 
@@ -46,6 +46,7 @@ for (counttype in counttypes) {
 
     ####
     dds <- DESeq(dds)
+    save.image()
     ####
     resultsNames(dds) # lists the coefficients
 
@@ -166,7 +167,6 @@ for (counttype in counttypes) {
             col=colors)
     dev.off()
     ####
-
 
     for (contrast in contrasts) {
         res <- results(dds, name=contrast)
