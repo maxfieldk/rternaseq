@@ -14,7 +14,7 @@ library("cowplot")
 library("eulerr")
 library("ggVennDiagram")
 library('Gviz')
-library(GenomicRanges)
+library('GenomicRanges')
 library('rtracklayer')
 library('trackViewer')
 library("org.Hs.eg.db")
@@ -311,8 +311,34 @@ print(grid)+ ggtitle(paste("DE repeats", contrast, sep=' '))
 dev.off()
 }
 
-master_deRTEs_df <- as.data.frame(do.call(cbind, master_deRTEs))
-try(write.table(master_deRTEs_df, file=snakemake@output[['deRTEsDF']]), TRUE)
+dedf = data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(),strand = character(),stringsAsFactors = FALSE)
+i=1
+active_names = c("L1HS", "AluY", "HERVK-int")
+for (tetype in active_names){
+    for (contrast in contrasts) {
+        elements = master_deRTEs[['telocal_uniq']][[tetype]][[gsub("condition_", "", contrast)]]
+        for (rte in elements) {
+            rte = str_split(rte, ":")[[1]][1]
+            print(rte)
+            location = getPos(rte, tab)
+            if (is.null(location)) {
+                next
+            }
+            chr = location["chr"][[1]]
+            start = location["start"][[1]]
+            stop = location["stop"][[1]]
+            strand = location["strand"][[1]]
+            vec = c(name, rte, chr, start, stop, strand)
+            dedf[i, ] <- vec
+            i = i+1
+        }
+    }
+}
+
+write.table(dedf, file=snakemake@output[['allactiveDETEs']], quote=FALSE,col.names=FALSE, row.names=FALSE, sep="\t")
+
+
+
 
 ########### Are de RTEs the same?
 
@@ -398,8 +424,8 @@ for (name in active_names) {
         i = i+1
     }
 }
-head(dedf)
-write.table(dedf, file=snakemake@output[['dertetsv']], row.names=FALSE, sep="\t")
+
+write.table(dedf, file=snakemake@output[['sharedamongallcontrasts_derte']], quote=FALSE,col.names=FALSE, row.names=FALSE, sep="\t")
 
 
 # #####

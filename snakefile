@@ -713,7 +713,8 @@ rule clusterprofiler:
 
 rule pyGenomeTracks:
     input:
-        bw = expand("outs/{sample}/{sample}_cov.bw", sample = samples)
+        bw = expand("outs/{sample}/{sample}_cov.bw", sample = samples),
+        allactiveDETEs = "results/agg/repeatanalysis/allactiveDETEs.tsv"
     params:
         refseq = config["refseq"],
         l1hs6kbintactbed = config["l1hs6kbintactbed"],
@@ -743,14 +744,17 @@ sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > 
 
 
 #manually modify tracks to show labels
-cat {params.l1hs6kbintactbed} | while read line
+cat {input.allactiveDETEs} | while read line
 do
-chr=$(awk '{{print $1}}' <<< $line)
-start=$(awk '{{print $2}}' <<< $line)
-stop=$(awk '{{print $3}}' <<< $line)
+tetype=$(awk '{{print $1}}' <<< $line)
+te=$(awk '{{print $2}}' <<< $line)
+chr=$(awk '{{print $3}}' <<< $line)
+start=$(awk '{{print $4}}' <<< $line)
+stop=$(awk '{{print $5}}' <<< $line)
+strand=$(awk '{{print $6}}' <<< $line)
 echo $chr $start $stop
-pyGenomeTracks --tracks {params.outputdir}/atracksMOD.ini --region ${{chr}}:$((${{start}}-500))-$((${{stop}}+500)) \
---dpi 300 -o {params.outputdir}/${{chr}}${{start}}${{stop}}.png 2>> {log}
+pyGenomeTracks --tracks {params.outputdir}/atracksMOD.ini --region ${{chr}}:$((${{start}}-1000))-$((${{stop}}+1000)) \
+--dpi 300 -o {params.outputdir}/${{te}}${{chr}}${{start}}${{stop}}.png 2>> {log}
 done
 
 touch {output.outfile}
@@ -765,8 +769,8 @@ rule repeatanalysis:
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
         sample_table = config["sample_table"],
-        contrast_colors =config["contrast_colors"]
-        condition_colors =config["condition_colors"]
+        contrast_colors =config["contrast_colors"],
+        condition_colors =config["condition_colors"],
         repeats = config["repeats"],
         telocalmapping = config["telocalmapping"],
         inputdir = "results/agg/deseq2",
@@ -779,7 +783,8 @@ rule repeatanalysis:
         activeelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/activeelementContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisactiveelementContrastplot.rst", category="repeat analysis"),
         familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/familyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
         combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/combinedContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
-        dertetsv = "results/agg/repeatanalysis/derte.tsv"
+        sharedamongallcontrasts_derte = "results/agg/repeatanalysis/sharedamongallcontrasts_derte.tsv",
+        allactiveDETEs = "results/agg/repeatanalysis/allactiveDETEs.tsv",
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
         "scripts/repeatanalysis.R"
