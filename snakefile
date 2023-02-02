@@ -756,8 +756,6 @@ done
 touch {output.outfile}
         """
 
-
-
 rule repeatanalysis:
     input:
         expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"])
@@ -767,6 +765,8 @@ rule repeatanalysis:
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
         sample_table = config["sample_table"],
+        contrast_colors =config["contrast_colors"]
+        condition_colors =config["condition_colors"]
         repeats = config["repeats"],
         inputdir = "results/agg/deseq2",
         outputdir = "results/agg/repeatanalysis"

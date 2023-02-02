@@ -52,13 +52,14 @@ for (counttype in counttypes) {
 
     ####
     vst <- assay(vst(dds))
-    sampleDists <- dist(t(assay(vsd)))
+    vst_full = vst(dds)
+    sampleDists <- dist(t(vst))
     counttablesizenormed <- counts(dds, normalized=T)
 
     ##PCA plots
-    p <- pca(vst, metadata = colData(dds), removeVar = 0.1)
+    pcaObj <- pca(vst, metadata = colData(dds), removeVar = 0.1)
     
-    screep = screeplot(p,title = "")+ 
+    screep = screeplot(pcaObj,title = "")+ 
     theme_cowplot() +
     theme(axis.line=element_blank(),aspect.ratio=1, panel.border = element_rect(color = "black", linetype = 1, linewidth = 1, fill = NA))
 
@@ -66,7 +67,7 @@ for (counttype in counttypes) {
     print(screep)
     dev.off()
 
-    loadingsp = plotloadings(p, components = getComponents(p, seq_len(3)), 
+    loadingsp = plotloadings(pcaObj, components = getComponents(pcaObj, seq_len(3)), 
     rangeRetain = 0.045, labSize = 4) +
     theme(legend.position = "none") +
     theme_cowplot() +
@@ -76,7 +77,7 @@ for (counttype in counttypes) {
     print(loadingsp)
     dev.off()
 
-    pcaplot = biplot(p, showLoadings = FALSE,  gridlines.major = FALSE, gridlines.minor = FALSE, borderWidth = 0,
+    pcaplot = biplot(pcaObj, showLoadings = FALSE,  gridlines.major = FALSE, gridlines.minor = FALSE, borderWidth = 0,
     colby = 'condition', legendPosition = "right",
     labSize = 5, pointSize = 5, sizeLoadingsNames = 5)
     pcap = pcaplot +
@@ -109,19 +110,8 @@ for (counttype in counttypes) {
     # eigencorplot(p, metavars = c('condition', 'sample_name'))
     # dev.off()
 
-    pcawithloadingsp = biplot(p,
-    lab = paste0(p$metadata$sample_name),
-    showLoadings = TRUE,
-    colby = 'condition',
-    hline = 0, vline = 0,
-    legendPosition = 'right')+
-    theme_cowplot() +
-    theme(axis.line=element_blank(),aspect.ratio=1, panel.border = element_rect(color = "black", linetype = 1, linewidth = 1, fill = NA))
-    pdf(paste(outputdir,counttype,"plots","pcaplot_with_loadings.pdf", sep = '/'), width=7, height=6)
-    print(pcawithloadingsp)
-    dev.off()
 
-    pcaplot_statelipse = biplot(p,
+    pcaplot_statelipse = biplot(pcaObj,
     colby = 'condition', colkey = c('PRO' = 'blue', 'ESEN' = 'yellow', 'LSEN' = 'red'),
     # ellipse config
       ellipse = TRUE,
@@ -138,30 +128,16 @@ for (counttype in counttypes) {
     print(pcaplot_statelipse)
     dev.off()
 
-    pcagenep = biplot(p, x = 'PC1', y = 'PC2',
-    lab = paste0(p$metadata$condition),
-    colby = 'IL6',
-    shape = 'condition',
-    hline = 0, vline = 0,
-    legendPosition = 'right') +
-    scale_colour_gradient(low = 'gold', high = 'red2')+
-    theme_cowplot() +
-    panel_border(color = "black", linetype = 1, remove = FALSE) +
-    theme(axis.line=element_blank()) +
-    theme(aspect.ratio=1)
-    pdf(paste(outputdir,counttype,"plots",paste0("pcaplot_", "IL6", ".pdf"), sep = '/'), width=6, height=5)
-    print(pcagenep)
-    dev.off()
 
     ############
 
     sampleDistMatrix <- as.matrix(sampleDists)
-    rownames(sampleDistMatrix) <- paste(vst$condition, vst$type, sep="-")
+    rownames(sampleDistMatrix) <- paste(vst_full$condition, vst_full$type, sep="-")
     colnames(sampleDistMatrix) <- NULL
     colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
 
     pdf(paste(outputdir,counttype,"plots","heatmapplot.pdf", sep = '/'), width=10, height=8)
-    pheatmap(sampleDistMatrix,
+    pheatmap::pheatmap(sampleDistMatrix,
             clustering_distance_rows=sampleDists, 
             clustering_distance_cols=sampleDists,
             col=colors)
