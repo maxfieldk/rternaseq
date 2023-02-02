@@ -768,6 +768,7 @@ rule repeatanalysis:
         contrast_colors =config["contrast_colors"]
         condition_colors =config["condition_colors"]
         repeats = config["repeats"],
+        telocalmapping = config["telocalmapping"],
         inputdir = "results/agg/deseq2",
         outputdir = "results/agg/repeatanalysis"
     conda:
@@ -778,6 +779,7 @@ rule repeatanalysis:
         activeelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/activeelementContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisactiveelementContrastplot.rst", category="repeat analysis"),
         familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/familyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
         combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/combinedContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
+        dertetsv = "results/agg/repeatanalysis/derte.tsv"
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
         "scripts/repeatanalysis.R"

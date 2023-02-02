@@ -355,24 +355,52 @@ for (e in names(pattern)) {
 # l1hs6kbintactbed = snakemake@params[["l1hs6kbintactbed"]]
 # repeatsbed = snakemake@params[["repeatsbed"]]
 # hs1sorted = snakemake@params[["hs1sorted"]]
-# mapper = read.delim(snakemake@params[["telocalmapping"]], sep = "\t")
 
-# #### functions
-# getPos <- function(rte, tab) {
-#     if (unname(tab[rte]) > 1) {
-#         return(NULL)
-#     } else {
-#         rterow = mapper %>% filter(TE == rte)
-#         val = rterow["chromosome.start.stop.strand"]
-#         chr = str_split(val, ":")[[1]][1]
-#         coords = str_split(val, ":")[[1]][2]
-#         strand = str_split(val, ":")[[1]][3]
-#         start = str_split(coords, "-")[[1]][1]
-#         stop = str_split(coords, "-")[[1]][2]
+
+mapper = read.delim(snakemake@params[["telocalmapping"]], sep = "\t")
+tab = table(mapper$TE)
+#### functions
+getPos <- function(rte, tab) {
+    if (unname(tab[rte]) > 1) {
+        return(NULL)
+    } else {
+        rterow = mapper %>% filter(TE == rte)
+        val = rterow["chromosome.start.stop.strand"]
+        chr = str_split(val, ":")[[1]][1]
+        coords = str_split(val, ":")[[1]][2]
+        strand = str_split(val, ":")[[1]][3]
+        start = str_split(coords, "-")[[1]][1]
+        stop = str_split(coords, "-")[[1]][2]
         
-#         return(list(chr = chr, start = as.numeric(start),stop = as.numeric(stop), strand = strand))
-#     }
-# }
+        return(list(chr = chr, start = as.numeric(start),stop = as.numeric(stop), strand = strand))
+    }
+}
+
+dedf = data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(),strand = character(),stringsAsFactors = FALSE)
+i=1
+active_names = c("L1HS", "AluY", "HERVK-int")
+for (name in active_names) {
+    dertelist = des_by_rte[name]
+    print(name)
+    for (rte in unlist(dertelist)) {
+        rte = str_split(rte, ":")[[1]][1]
+        print(rte)
+        location = getPos(rte, tab)
+        if (is.null(location)) {
+            next
+        }
+        chr = location["chr"][[1]]
+        start = location["start"][[1]]
+        stop = location["stop"][[1]]
+        strand = location["strand"][[1]]
+        vec = c(name, rte, chr, start, stop, strand)
+        dedf[i, ] <- vec
+        i = i+1
+    }
+}
+head(dedf)
+write.table(dedf, file=snakemake@output[['dertetsv']], row.names=FALSE, sep="\t")
+
 
 # #####
 # tab = table(mapper$TE)
