@@ -1,0 +1,15 @@
+name: deeptools
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - bedtools
+  - pygenometracks
+  - deeptools
+  - ipykernel
+  - ipython
+  - bowtie2
+  - python=3.9
+

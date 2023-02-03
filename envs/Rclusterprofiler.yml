@@ -1,0 +1,23 @@
+name: Rclusterprofiler
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - r-base=4.2.2
+  - r-magrittr
+  - r-stringr
+  - r-stringr
+  - r-cowplot
+  - r-ggplot2
+  - r-ggridges
+  - r-readr
+  - r-tibble
+  - r-ggbeeswarm
+  - bioconductor-org.Hs.eg.db
+  - bioconductor-clusterProfiler
+  - bioconductor-enrichplot
+  - bioconductor-AnnotationDbi
+  - bioconductor-pathview
+

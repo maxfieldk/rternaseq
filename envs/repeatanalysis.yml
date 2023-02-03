@@ -1,0 +1,23 @@
+name: repeatanalysis
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - r-base=4.2.2
+  - r-readr
+  - r-dplyr
+  - r-ggplot2
+  - r-tibble
+  - r-RColorBrewer
+  - r-magrittr
+  - r-cowplot
+  - r-eulerr
+  - r-ggvenndiagram
+  - bioconductor-GenomicFeatures
+  - bioconductor-trackViewer
+  - bioconductor-org.Hs.eg.db
+  - bioconductor-AnnotationDbi
+  - bioconductor-Gviz
+
