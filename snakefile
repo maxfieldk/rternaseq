@@ -762,7 +762,8 @@ touch {output.outfile}
 
 rule repeatanalysis:
     input:
-        expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"])
+        deseq = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
+        telocal = expand("outs/{sample}/TElocal/{sample}_{maptype}.cntTable", sample = samples, maptype = ["multi", "uniq"])
     params:
         contrasts = config["contrasts"],
         counttypes = config["counttypes"],

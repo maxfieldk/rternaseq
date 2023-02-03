@@ -22,11 +22,13 @@ save.image()
 
 #order matters for the colors!
 contrast_colors = snakemake@params[["contrast_colors"]]
+contrast_colors = unname(unlist(contrast_colors))
 condition_colors = snakemake@params[["condition_colors"]]
+condition_colors = unname(unlist(condition_colors))
 ######## MAIN FUNCTIONS
 ####PLOTTING
 plotRTE = function(rte, df, lims= c(-1, 11), title = "", colors = c("red", "blue", "grey"), alpha = 1, number_to_sample = NULL) {
-    matches = grep("ERV.:LTR", results$Geneid)
+    matches = grep(rte, results$Geneid)
     dat = results[matches,]
     if (is.null(number_to_sample)) {
         rteplot = dat %>% ggplot() +
@@ -82,13 +84,14 @@ euPlot = function(fit, fill = c("red", "blue"), legend = TRUE, labels = FALSE, m
         main = main,
         fill = fill,
         legend = legend,
-        quantities = TRUE,
+        quantities = list(col = "white"),
         labels = labels)
 }
 ######
 ##########################
 contrasts = snakemake@params[["contrasts"]]
 levelslegendmap =snakemake@params[["levelslegendmap"]]
+counttypes = snakemake@params[["telocaltypes"]]
 
 for (counttype in snakemake@params[["telocaltypes"]]) {
 
@@ -245,8 +248,7 @@ for (contrast in contrasts) {
 # If a row is filtered by automatic independent filtering, for having a low mean normalized count, then only the adjusted p value will be set to NA. Description and customization of independent filtering is described below
 
 
-################################################Venn diagrams
-
+################################################Venn diagrams of non-RTEs
 for (counttype in snakemake@params[["counttypes"]]) {
     outputdir = paste(snakemake@params[["outputdir"]], counttype, sep = "/")
     UP = list()
@@ -274,13 +276,13 @@ for (counttype in snakemake@params[["counttypes"]]) {
     print(grid)
     dev.off()
 }
-####################
+
+################################################
 master_deRTEs = list()
 for (counttype in snakemake@params[["telocaltypes"]]) {
     outputdir = paste(snakemake@params[["outputdir"]], counttype, sep = "/")
     pattern = list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int")
     names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int")
-    plots = list()
     deRTEs = list()
     for (e in names(pattern)) {
         rte = e
@@ -295,28 +297,37 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
             contrastL = c(contrastL, sigsearched)
             }
         deRTEs[[e]] = contrastL
-        fit <- euler(contrastL, shape = "ellipse")
-        p = euPlot(fit, contrast_colors, main = rte)
-        pdf(paste(outputdir, paste0("VennDiagram", rte, ".pdf"), sep = '/'), width=4, height=4)
-        print(p)
-        dev.off()
-
-        p_no_title = euPlot(fit, contrast_colors, legend = TRUE)
-        plots = c(plots, list(p_no_title))
     }
 master_deRTEs[[counttype]] = deRTEs
-grid = plot_grid(plotlist = plots, labels = names(pattern), ncol = 3)
-pdf(paste(outputdir, paste0("VennDiagram", "RTEs", ".pdf"), sep = '/'), width=9, height=6)
-print(grid)+ ggtitle(paste("DE repeats", contrast, sep=' '))
-dev.off()
+}
+
+
+####### Write the DE results to table
+mapper = read.delim(snakemake@params[["telocalmapping"]], sep = "\t")
+tab = table(mapper$TE)
+#### functions
+getPos <- function(rte, tab) {
+    if (unname(tab[rte]) > 1) {
+        return(NULL)
+    } else {
+        rterow = mapper %>% filter(TE == rte)
+        val = rterow["chromosome.start.stop.strand"]
+        chr = str_split(val, ":")[[1]][1]
+        coords = str_split(val, ":")[[1]][2]
+        strand = str_split(val, ":")[[1]][3]
+        start = str_split(coords, "-")[[1]][1]
+        stop = str_split(coords, "-")[[1]][2]
+        
+        return(list(chr = chr, start = as.numeric(start),stop = as.numeric(stop), strand = strand))
+    }
 }
 
 dedf = data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(),strand = character(),stringsAsFactors = FALSE)
 i=1
 active_names = c("L1HS", "AluY", "HERVK-int")
-for (tetype in active_names){
+for (name in active_names){
     for (contrast in contrasts) {
-        elements = master_deRTEs[['telocal_uniq']][[tetype]][[gsub("condition_", "", contrast)]]
+        elements = master_deRTEs[['telocal_uniq']][[name]][[gsub("condition_", "", contrast)]]
         for (rte in elements) {
             rte = str_split(rte, ":")[[1]][1]
             print(rte)
@@ -336,8 +347,6 @@ for (tetype in active_names){
 }
 
 write.table(dedf, file=snakemake@output[['allactiveDETEs']], quote=FALSE,col.names=FALSE, row.names=FALSE, sep="\t")
-
-
 
 
 ########### Are de RTEs the same?
@@ -371,6 +380,86 @@ for (e in names(pattern)) {
     des_by_rte[[e]] = set_des
 }
 
+############ Calculating significance of overalps
+
+## For stats purposes
+telocalcountsample1 = read.csv(snakemake@input[["telocal"]][[1]])
+#telocalcountsample1 =read.delim("/users/mkelsey/data/marco/outs/SRR6515349/TElocal/SRR6515349_uniq.cntTable", sep = "\t")
+allgenes = telocalcountsample1[[1]]
+pattern = list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int")
+names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int")
+
+numberOfInstances = list()
+for (e in names(pattern)) {
+    rte = e
+    matches = grep(pattern[e], allgenes)
+    numberOfInstances[e] = length(matches)
+    }
+
+sigdf = data.frame(counttype = character(), element = character(), sig = numeric())
+i=1
+for (counttype in counttypes){
+    for (e in names(pattern)) {
+        ntotal = unname(unlist(numberOfInstances[e]))
+        contrast_lengths = c()
+        for (thing in master_deRTEs[[counttype]][[e]]) {
+            contrast_lengths = c(contrast_lengths, length(thing))
+        }
+        overlap = length(des_by_counttype[[counttype]][[e]])
+
+        significance = phyper(overlap-1, contrast_lengths[2], ntotal-contrast_lengths[2], contrast_lengths[1], lower.tail= FALSE)
+        if (length(contrasts)>2) {
+            significance = NULL
+        }
+        vec = list(counttype, e, significance)
+        sigdf[i,] <- vec
+        i = i+1
+    }
+}
+sigdf = sigdf %>% mutate(sigcode = ifelse(sig>0.05, "NS", ifelse(sig>0.01, "*", ifelse(sig>0.001, "**", "***"))))
+
+
+###########################
+for (counttype in snakemake@params[["telocaltypes"]]) {
+    outputdir = paste(snakemake@params[["outputdir"]], counttype, sep = "/")
+    pattern = list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int")
+    names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int")
+    plots = list()
+    for (e in names(pattern)) {
+        rte = e
+        contrastL = list()
+        for (contrast in contrasts) {
+            df = read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast , "results.csv", sep = "/"))
+            colnames(df)[1] <- "Geneid"
+            matches = grep(pattern[e], df$Geneid)
+            searched_element = df[matches,]
+            sigsearched = list(searched_element[searched_element$padj < 0.05, 'Geneid'] %>% na.omit())  
+            names(sigsearched) <- gsub("condition_", "", contrast)
+            contrastL = c(contrastL, sigsearched)
+            }
+        fit <- euler(contrastL, shape = "ellipse")
+        p = euPlot(fit, contrast_colors, main = rte)
+        sig = sigdf[sigdf$counttype == counttype & sigdf$element == e,]$sigcode
+        pl <- ggdraw(p) + annotate("text",label = sig, x=Inf, y = Inf, vjust=1, hjust=1, size = 20)
+        pdf(paste(outputdir, paste0("VennDiagram", rte, ".pdf"), sep = '/'), width=4, height=4)
+        print(pl)
+        dev.off()
+        p_no_title = euPlot(fit, contrast_colors, legend = TRUE)
+        plnotitle <- ggdraw(p_no_title) + annotate("text",label = sig, x=Inf, y = Inf, vjust=1, hjust=1, size = 10)
+        plots[[e]]=plnotitle
+    }
+grid = plot_grid(plotlist = plots, labels = names(pattern), ncol = 3)
+pdf(paste(outputdir, paste0("VennDiagram", "RTEs", ".pdf"), sep = '/'), width=9, height=6)
+print(grid)+ ggtitle(paste("DE repeats", contrast, sep=' '))
+dev.off()
+
+l1plots = plots[c("L1", "L1HS")]
+grid = plot_grid(plotlist = l1plots,labels = names(l1plots), ncol = 2)
+pdf(paste(outputdir, paste0("VennDiagram", "L1andL1HS", ".pdf"), sep = '/'), width=6, height=3)
+print(grid)
+dev.off()
+}
+
 
 
 # ############################### GVIZ
@@ -382,25 +471,7 @@ for (e in names(pattern)) {
 # repeatsbed = snakemake@params[["repeatsbed"]]
 # hs1sorted = snakemake@params[["hs1sorted"]]
 
-
-mapper = read.delim(snakemake@params[["telocalmapping"]], sep = "\t")
-tab = table(mapper$TE)
-#### functions
-getPos <- function(rte, tab) {
-    if (unname(tab[rte]) > 1) {
-        return(NULL)
-    } else {
-        rterow = mapper %>% filter(TE == rte)
-        val = rterow["chromosome.start.stop.strand"]
-        chr = str_split(val, ":")[[1]][1]
-        coords = str_split(val, ":")[[1]][2]
-        strand = str_split(val, ":")[[1]][3]
-        start = str_split(coords, "-")[[1]][1]
-        stop = str_split(coords, "-")[[1]][2]
-        
-        return(list(chr = chr, start = as.numeric(start),stop = as.numeric(stop), strand = strand))
-    }
-}
+################# write table for DEs shared amongst all constrasts
 
 dedf = data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(),strand = character(),stringsAsFactors = FALSE)
 i=1
@@ -567,19 +638,6 @@ write.table(dedf, file=snakemake@output[['sharedamongallcontrasts_derte']], quot
 #     extend.left = 0.1, extend.right = 0.1,  ylim = c(0, 1000),
 #     featureAnnotation = "id")
 # dev.off()
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #################### RTE in genome histograms
 outputdir = snakemake@params[["outputdir"]]
