@@ -5,7 +5,10 @@ channels:
   - defaults
   - r
 dependencies:
+  - ipykernel
+  - jupyter
   - r-base=4.2.2
+  - r-irkernel
   - r-readr
   - r-dplyr
   - r-ggplot2
@@ -14,6 +17,7 @@ dependencies:
   - r-magrittr
   - r-cowplot
   - r-eulerr
+  - r-RIdeogram
   - r-ggvenndiagram
   - bioconductor-GenomicFeatures
   - bioconductor-trackViewer
