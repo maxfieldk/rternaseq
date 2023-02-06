@@ -81,6 +81,11 @@ if True:
     if not os.path.exists(path):
         os.makedirs(path)
 
+    path = "results/agg/repeatanalysis/genometracks"
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
     for counttype in config["counttypes"]:
         path = "results/agg/repeatanalysis/%s"%(counttype)
         if not os.path.exists(path):
@@ -89,6 +94,17 @@ if True:
     for counttype in config["counttypes"]:
         for contrast in config["contrasts"]:
             path = 'results/agg/repeatanalysis/%s/%s'%(counttype,contrast)
+            if not os.path.exists(path):
+                os.makedirs(path)
+
+    for counttype in config["counttypes"]:
+        path = "results/agg/repeatanalysis/genometracks/%s"%(counttype)
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    for counttype in config["counttypes"]:
+        for contrast in config["contrasts"]:
+            path = 'results/agg/repeatanalysis/genometracks/%s/%s'%(counttype,contrast)
             if not os.path.exists(path):
                 os.makedirs(path)
 
@@ -544,7 +560,7 @@ plotCoverage -b {input.bam} \
         """
 
 
-
+#note that this is coverage based and therefore not adjusted for library size
 rule deeptools_plotAggcoverage:
     input:
         coverage = "outs/{sample}/{sample}_cov.bw"
@@ -714,11 +730,13 @@ rule clusterprofiler:
 rule pyGenomeTracks:
     input:
         bw = expand("outs/{sample}/{sample}_cov.bw", sample = samples),
-        allactiveDETEs = "results/agg/repeatanalysis/allactiveDETEs.tsv"
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv"
     params:
         refseq = config["refseq"],
         l1hs6kbintactbed = config["l1hs6kbintactbed"],
         repeatsbed = config["repeatsbed"],
+        contrasts = config["contrasts"],
+        telocaltypes = config["telocaltypes"],
         outputdir = "results/agg/repeatanalysis/genometracks"
     conda:
         "envs/deeptools.yml"
@@ -726,39 +744,69 @@ rule pyGenomeTracks:
         "logs/agg/pyGenomeTracks.log"
     output:
         outfile = "results/agg/repeatanalysis/genometracks/outfile.txt"
-    shell:
-        """
-make_tracks_file --trackFiles \
-{params.l1hs6kbintactbed} \
-{input.bw} \
-{params.repeatsbed} \
--o {params.outputdir}/atracks.ini 2> {log}
-
-#modify tracks ini file to show labels
-#I set the max height for all rna tracks to 50
-sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD1.ini
-sed 's/#overlay_previous = yes/overlay_previous = share-y/g' {params.outputdir}/atracksMOD1.ini > {params.outputdir}/atracksMOD2.ini
-sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD2.ini > {params.outputdir}/atracksMOD3.ini
-sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD3.ini > {params.outputdir}/atracksMOD4.ini
-sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > {params.outputdir}/atracksMOD.ini
+    script:
+        "scripts/pygenometracks.sh"
 
 
-#manually modify tracks to show labels
-cat {input.allactiveDETEs} | while read line
-do
-tetype=$(awk '{{print $1}}' <<< $line)
-te=$(awk '{{print $2}}' <<< $line)
-chr=$(awk '{{print $3}}' <<< $line)
-start=$(awk '{{print $4}}' <<< $line)
-stop=$(awk '{{print $5}}' <<< $line)
-strand=$(awk '{{print $6}}' <<< $line)
-echo $chr $start $stop
-pyGenomeTracks --tracks {params.outputdir}/atracksMOD.ini --region ${{chr}}:$((${{start}}-1000))-$((${{stop}}+1000)) \
---dpi 300 -o {params.outputdir}/${{te}}${{chr}}${{start}}${{stop}}.png 2>> {log}
-done
+#         """
+# make_tracks_file --trackFiles \
+# {params.l1hs6kbintactbed} \
+# {input.bw} \
+# {params.repeatsbed} \
+# -o {params.outputdir}/atracks.ini 2> {log}
 
-touch {output.outfile}
-        """
+# #modify tracks ini file to show labels
+# #I set the max height for all rna tracks to 50
+# sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD1.ini
+# sed 's/#overlay_previous = yes/overlay_previous = share-y/g' {params.outputdir}/atracksMOD1.ini > {params.outputdir}/atracksMOD2.ini
+# sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD2.ini > {params.outputdir}/atracksMOD3.ini
+# sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD3.ini > {params.outputdir}/atracksMOD4.ini
+# sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > {params.outputdir}/atracksMOD.ini
+
+
+# #manually modify tracks to show labels
+# for telocaltype in {params.telocaltypes}
+# do
+# for contrast in {params.contrasts}
+# do
+# cat {input.DETEsbyContrast} | while read line
+# do
+# tetype=$(awk '{{print $1}}' <<< $line)
+# te=$(awk '{{print $2}}' <<< $line)
+# chr=$(awk '{{print $3}}' <<< $line)
+# start=$(awk '{{print $4}}' <<< $line)
+# stop=$(awk '{{print $5}}' <<< $line)
+# strand=$(awk '{{print $6}}' <<< $line)
+# direction=$(awk '{{print $7}}' <<< $line)
+# counttype=$(awk '{{print $9}}' <<< $line)
+# contrasttype=$(awk '{{print $8}}' <<< $line)
+# echo $chr $start $stop
+
+# if [ $tetype == AluY ]
+# then
+# flanklength=200
+# elif [ $tetype == L1HS ]
+# then
+# flanklength=1000
+# else
+# flanklength=1000
+# fi
+
+# echo $tetype
+# echo $flanklength
+
+# if [ $counttype == $telocaltype ] && [ $contrasttype == $contrast]
+# then
+# pyGenomeTracks --tracks {params.outputdir}/atracksMOD.ini --region ${{chr}}:$((${{start}}-${{flanklength}}))-$((${{stop}}+${{flanklength}})) \
+# --dpi 300 --title ${{te}} -o {params.outputdir}/${{telocaltype}}/${{contrast}}/${{te}}${{chr}}${{start}}${{stop}}.png 2>> {log}
+# fi
+
+# done
+# done
+# done
+
+# touch {output.outfile}
+#         """
 
 rule repeatanalysis:
     input:

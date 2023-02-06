@@ -18,6 +18,7 @@ library("GenomicRanges")
 library("rtracklayer")
 library("trackViewer")
 library("org.Hs.eg.db")
+library("ggrepel")
 save.image()
 
 # order matters for the colors!
@@ -31,12 +32,17 @@ my_comma <- function(num) {
     format(round(as.numeric(num), 1), nsmall = 0, big.mark = ",")
 }
 #### PLOTTING
-plotRTE <- function(rte, df, lims = c(-1, 11), title = "", colors = c("red", "blue", "grey"), alpha = 1, number_to_sample = NULL) {
+plotRTE <- function(rte, df, lims = c(-1, 11), title = "", colors = c("red", "blue", "grey"), alpha = 1, number_to_sample = NULL, annotate_top = NULL) {
     matches <- grep(rte, results$Geneid)
     dat <- results[matches, ]
     if (is.null(number_to_sample)) {
-        rteplot <- dat %>% ggplot() +
-            geom_point(aes(x = .data[[xval]], y = .data[[yval]], color = Significance)) +
+        arranged = dat %>% arrange(padj)
+        arranged$rank  <- row.names(arranged) 
+        arranged$rank <- as.integer(arranged$rank)
+        arranged = arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
+        arranged = arranged %>% mutate(tename = str_split(Geneid, ":", simplify = TRUE)[, 1])
+        rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
+            geom_point(aes(color = Significance)) +
             geom_abline(intercept = 0) +
             coord_fixed() +
             xlim(lims) +
@@ -46,13 +52,27 @@ plotRTE <- function(rte, df, lims = c(-1, 11), title = "", colors = c("red", "bl
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
             theme(axis.line = element_blank()) +
-            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " "))
+            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " ")) +    
+            geom_label_repel(data = . %>% mutate(label = ifelse(labelshow == "yes", .data[["tename"]], "")),
+            aes(label = label),
+            box.padding   = 0.5, 
+            point.padding = 0.5,
+            nudge_x = -.15,
+            nudge_y = 1.5,
+            min.segment.length = 0,
+            max.overlaps = Inf,
+            segment.color = 'grey50')
         return(rteplot)
     } else {
         number_to_sample <- min(length(rownames(dat)), number_to_sample)
         datasampled <- dat[sample(rownames(dat), number_to_sample, replace = FALSE), ]
-        rteplot <- datasampled %>% ggplot() +
-            geom_point(aes(x = .data[[xval]], y = .data[[yval]], color = Significance)) +
+        arranged = datasampled %>% arrange(padj)
+        arranged$rank  <- row.names(arranged) 
+        arranged$rank <- as.integer(arranged$rank)
+        arranged = arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
+        arranged = arranged %>% mutate(tename = str_split(Geneid, ":", simplify = TRUE)[, 1])
+        rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
+            geom_point(aes(color = Significance)) +
             geom_abline(intercept = 0) +
             coord_fixed() +
             xlim(lims) +
@@ -62,7 +82,16 @@ plotRTE <- function(rte, df, lims = c(-1, 11), title = "", colors = c("red", "bl
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
             theme(axis.line = element_blank()) +
-            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " "))
+            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " ")) +    
+            geom_label_repel(data = . %>% mutate(label = ifelse(labelshow == "yes", .data[["tename"]], "")),
+            aes(label = label),
+            box.padding   = 0.5, 
+            point.padding = 0.5,
+            nudge_x = -.15,
+            nudge_y = 1.5,
+            min.segment.length = 0,
+            max.overlaps = Inf,
+            segment.color = 'grey50')
         return(rteplot)
     }
 }
@@ -213,6 +242,16 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         herv_lims <- c(-1, 11)
 
         ##### ACTIVE RTE PLOTS
+        #annotated plots
+        pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int")
+        names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int")
+        for (e in names(pattern[1:6])) {
+            tempplot <- plotRTE(pattern[[e]], results, l1_lims, title = e, number_to_sample = 1000, annotate_top = 5)
+            pdf(paste(outputdir, contrast, paste0(e,"annotated", ".pdf"), sep = "/"), width = 5, height = 4)
+            print(tempplot)
+            dev.off()
+        }
+
         l1hs <- plotRTE("L1HS:L1", results, l1_lims, title = "L1HS", )
         aluy <- plotRTE("AluY:Alu", results, alu_lims, title = "AluY", )
         hervk <- plotRTE("HERVK(.)*int", results, herv_lims, title = "HERVK", )
@@ -303,11 +342,10 @@ for (counttype in snakemake@params[["counttypes"]]) {
         DOWN[[gsub("condition_", "", contrast)]] <- dfDOWN
     }
     fit <- euler(UP, shape = "ellipse")
-    upplot <- euPlot(fit, contrasts, main = "UP", legend = FALSE)
+    upplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors,main = "UP", legend = FALSE)
 
     fit <- euler(DOWN, shape = "ellipse")
-    downplot <- euPlot(fit, contrasts, main = "DOWN", legend = FALSE)
-    legd <- makeLegendGrob(gsub("condition_", "", contrasts))
+    downplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors,main = "DOWN", legend = FALSE)    legd <- makeLegendGrob(gsub("condition_", "", contrasts))
 
     plots <- list(upplot, downplot)
     grid <- plot_grid(plotlist = plots, labels = "AUTO", ncol = 1)
@@ -370,7 +408,7 @@ getPos <- function(rte, tab) {
     }
 }
 
-dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), stringsAsFactors = FALSE)
+dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), stringsAsFactors = FALSE)
 i <- 1
 rtenames <- c("L1HS", "AluY", "HERVK-int")
 for (direction in c("UP", "DOWN")) {
@@ -389,7 +427,8 @@ for (direction in c("UP", "DOWN")) {
                     start <- location["start"][[1]]
                     stop <- location["stop"][[1]]
                     strand <- location["strand"][[1]]
-                    vec <- c(name, rte, chr, start, stop, strand, direction, contrast, telocaltype)
+                    length <- stop - start
+                    vec <- c(name, rte, chr, start, stop, strand, direction, contrast, telocaltype, length)
                     dedf[i, ] <- vec
                     i <- i + 1
                 }
@@ -550,7 +589,7 @@ for (direction in c("UP", "DOWN")) {
 
 ################# write table for DEs shared amongst all constrasts
 
-dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), stringsAsFactors = FALSE)
+dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), length = numeric(), stringsAsFactors = FALSE)
 i <- 1
 rtenames <- c("L1HS", "AluY", "HERVK-int")
 for (direction in c("UP", "DOWN")) {
@@ -568,7 +607,8 @@ for (direction in c("UP", "DOWN")) {
             start <- location["start"][[1]]
             stop <- location["stop"][[1]]
             strand <- location["strand"][[1]]
-            vec <- c(name, rte, chr, start, stop, strand, direction)
+            length <- stop - start
+            vec <- c(name, rte, chr, start, stop, strand, direction, length)
             dedf[i, ] <- vec
             i <- i + 1
         }
