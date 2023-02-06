@@ -785,7 +785,7 @@ rule repeatanalysis:
         familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/familyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
         combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/combinedContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
         sharedamongallcontrasts_derte = "results/agg/repeatanalysis/sharedamongallcontrasts_derte.tsv",
-        allactiveDETEs = "results/agg/repeatanalysis/allactiveDETEs.tsv",
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
         "scripts/repeatanalysis.R"
