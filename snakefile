@@ -790,6 +790,32 @@ rule repeatanalysis:
     script:
         "scripts/repeatanalysis.R"
 
+
+
+rule ideogram:
+    input:
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
+    params:
+        contrasts = config["contrasts"],
+        telocaltypes = config["telocaltypes"],
+        rtestoplot = config["rtestoplot"],
+        sample_table = config["sample_table"],
+        karyotype = config["karyotype"],
+        genedensity = config["genedensity"],
+        namedcolorlist = config["namedcolorlist"],
+        namedmarkerlist = config["namedmarkerlist"],
+        outputdir = "results/agg/repeatanalysis"
+    conda:
+        "envs/repeatanalysis.yml"
+    log:
+        "logs/agg/ideogram.log"
+    output:
+        outfile = "results/agg/repeatanalysis/ideogram_outfile.txt"
+    script:
+        "scripts/ideogram.R"
+
+
+
 rule deeptools_plotAggSignal:
     input:
         coverage = expand("outs/{sample}/{sample}_cov.bw", sample = samples)
