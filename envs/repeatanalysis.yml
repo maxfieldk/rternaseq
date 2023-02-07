@@ -19,6 +19,7 @@ dependencies:
   - r-eulerr
   - r-RIdeogram
   - r-ggvenndiagram
+  - r-ggrepel
   - bioconductor-GenomicFeatures
   - bioconductor-trackViewer
   - bioconductor-org.Hs.eg.db

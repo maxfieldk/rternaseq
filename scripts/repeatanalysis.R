@@ -32,7 +32,7 @@ my_comma <- function(num) {
     format(round(as.numeric(num), 1), nsmall = 0, big.mark = ",")
 }
 #### PLOTTING
-plotRTE <- function(rte, df, lims = c(-1, 11), title = "", colors = c("red", "blue", "grey"), alpha = 1, number_to_sample = NULL, annotate_top = NULL) {
+plotRTE <- function(rte, df, lims = c(-1, 11), title = "", colors = c("red", "blue", "grey"), alpha = 1, number_to_sample = NULL, annotate_top = 0) {
     matches <- grep(rte, results$Geneid)
     dat <- results[matches, ]
     if (is.null(number_to_sample)) {
@@ -345,7 +345,8 @@ for (counttype in snakemake@params[["counttypes"]]) {
     upplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors,main = "UP", legend = FALSE)
 
     fit <- euler(DOWN, shape = "ellipse")
-    downplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors,main = "DOWN", legend = FALSE)    legd <- makeLegendGrob(gsub("condition_", "", contrasts))
+    downplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors,main = "DOWN", legend = FALSE)
+    legd <- makeLegendGrob(gsub("condition_", "", contrasts))
 
     plots <- list(upplot, downplot)
     grid <- plot_grid(plotlist = plots, labels = "AUTO", ncol = 1)
