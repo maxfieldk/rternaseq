@@ -81,6 +81,11 @@ if True:
     if not os.path.exists(path):
         os.makedirs(path)
 
+    path = "results/agg/repeatanalysis/genometracks"
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
     for counttype in config["counttypes"]:
         path = "results/agg/repeatanalysis/%s"%(counttype)
         if not os.path.exists(path):
@@ -89,6 +94,17 @@ if True:
     for counttype in config["counttypes"]:
         for contrast in config["contrasts"]:
             path = 'results/agg/repeatanalysis/%s/%s'%(counttype,contrast)
+            if not os.path.exists(path):
+                os.makedirs(path)
+
+    for counttype in config["counttypes"]:
+        path = "results/agg/repeatanalysis/genometracks/%s"%(counttype)
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+    for counttype in config["counttypes"]:
+        for contrast in config["contrasts"]:
+            path = 'results/agg/repeatanalysis/genometracks/%s/%s'%(counttype,contrast)
             if not os.path.exists(path):
                 os.makedirs(path)
 
@@ -471,6 +487,8 @@ rule featureCounts:
     output:
         countsmessy = "outs/agg/refseq.counts_messy.txt",
         counts = "outs/agg/refseq.counts.txt",
+        countsstrandnonspecificmessy = "outs/agg/refseq.countsstrandnonspecific_messy.txt",
+        countsstrandnonspecific = "outs/agg/refseq.countsstrandnonspecific.txt",
         metafeaturecounts = "outs/agg/refseq.metafeature.counts.txt"
     params: 
         gtf = config['refseq'],
@@ -483,7 +501,9 @@ rule featureCounts:
         """
 featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -t exon -a {params.gtf} -o {output.countsmessy} {input.sortedSTARbams} 2> {log}
 cut -f1,7- {output.countsmessy} | awk 'NR > 1' > {output.counts}
-featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
+featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -B -O -a {params.gtf} -o {output.countsstrandnonspecificmessy} {input.sortedSTARbams} 2>> {log}
+cut -f1,7- {output.countsstrandnonspecificmessy} | awk 'NR > 1' > {output.countsstrandnonspecific}
+featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
         """
 #######################################################################
 # deeptools plots
@@ -540,7 +560,7 @@ plotCoverage -b {input.bam} \
         """
 
 
-
+#note that this is coverage based and therefore not adjusted for library size
 rule deeptools_plotAggcoverage:
     input:
         coverage = "outs/{sample}/{sample}_cov.bw"
@@ -709,11 +729,14 @@ rule clusterprofiler:
 
 rule pyGenomeTracks:
     input:
-        bw = expand("outs/{sample}/{sample}_cov.bw", sample = samples)
+        bw = expand("outs/{sample}/{sample}_cov.bw", sample = samples),
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv"
     params:
         refseq = config["refseq"],
         l1hs6kbintactbed = config["l1hs6kbintactbed"],
         repeatsbed = config["repeatsbed"],
+        contrasts = config["contrasts"],
+        telocaltypes = config["telocaltypes"],
         outputdir = "results/agg/repeatanalysis/genometracks"
     conda:
         "envs/deeptools.yml"
@@ -721,49 +744,84 @@ rule pyGenomeTracks:
         "logs/agg/pyGenomeTracks.log"
     output:
         outfile = "results/agg/repeatanalysis/genometracks/outfile.txt"
-    shell:
-        """
-make_tracks_file --trackFiles \
-{params.l1hs6kbintactbed} \
-{input.bw} \
-{params.repeatsbed} \
--o {params.outputdir}/atracks.ini 2> {log}
-
-#modify tracks ini file to show labels
-#I set the max height for all rna tracks to 50
-sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD1.ini
-sed 's/#overlay_previous = yes/overlay_previous = share-y/g' {params.outputdir}/atracksMOD1.ini > {params.outputdir}/atracksMOD2.ini
-sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD2.ini > {params.outputdir}/atracksMOD3.ini
-sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD3.ini > {params.outputdir}/atracksMOD4.ini
-sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > {params.outputdir}/atracksMOD.ini
+    script:
+        "scripts/pygenometracks.sh"
 
 
-#manually modify tracks to show labels
-cat {params.l1hs6kbintactbed} | while read line
-do
-chr=$(awk '{{print $1}}' <<< $line)
-start=$(awk '{{print $2}}' <<< $line)
-stop=$(awk '{{print $3}}' <<< $line)
-echo $chr $start $stop
-pyGenomeTracks --tracks {params.outputdir}/atracksMOD.ini --region ${{chr}}:$((${{start}}-500))-$((${{stop}}+500)) \
---dpi 300 -o {params.outputdir}/${{chr}}${{start}}${{stop}}.png 2>> {log}
-done
+#         """
+# make_tracks_file --trackFiles \
+# {params.l1hs6kbintactbed} \
+# {input.bw} \
+# {params.repeatsbed} \
+# -o {params.outputdir}/atracks.ini 2> {log}
 
-touch {output.outfile}
-        """
+# #modify tracks ini file to show labels
+# #I set the max height for all rna tracks to 50
+# sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD1.ini
+# sed 's/#overlay_previous = yes/overlay_previous = share-y/g' {params.outputdir}/atracksMOD1.ini > {params.outputdir}/atracksMOD2.ini
+# sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD2.ini > {params.outputdir}/atracksMOD3.ini
+# sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD3.ini > {params.outputdir}/atracksMOD4.ini
+# sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > {params.outputdir}/atracksMOD.ini
 
 
+# #manually modify tracks to show labels
+# for telocaltype in {params.telocaltypes}
+# do
+# for contrast in {params.contrasts}
+# do
+# cat {input.DETEsbyContrast} | while read line
+# do
+# tetype=$(awk '{{print $1}}' <<< $line)
+# te=$(awk '{{print $2}}' <<< $line)
+# chr=$(awk '{{print $3}}' <<< $line)
+# start=$(awk '{{print $4}}' <<< $line)
+# stop=$(awk '{{print $5}}' <<< $line)
+# strand=$(awk '{{print $6}}' <<< $line)
+# direction=$(awk '{{print $7}}' <<< $line)
+# counttype=$(awk '{{print $9}}' <<< $line)
+# contrasttype=$(awk '{{print $8}}' <<< $line)
+# echo $chr $start $stop
+
+# if [ $tetype == AluY ]
+# then
+# flanklength=200
+# elif [ $tetype == L1HS ]
+# then
+# flanklength=1000
+# else
+# flanklength=1000
+# fi
+
+# echo $tetype
+# echo $flanklength
+
+# if [ $counttype == $telocaltype ] && [ $contrasttype == $contrast]
+# then
+# pyGenomeTracks --tracks {params.outputdir}/atracksMOD.ini --region ${{chr}}:$((${{start}}-${{flanklength}}))-$((${{stop}}+${{flanklength}})) \
+# --dpi 300 --title ${{te}} -o {params.outputdir}/${{telocaltype}}/${{contrast}}/${{te}}${{chr}}${{start}}${{stop}}.png 2>> {log}
+# fi
+
+# done
+# done
+# done
+
+# touch {output.outfile}
+#         """
 
 rule repeatanalysis:
     input:
-        expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"])
+        deseq = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
+        telocal = expand("outs/{sample}/TElocal/{sample}_{maptype}.cntTable", sample = samples, maptype = ["multi", "uniq"])
     params:
         contrasts = config["contrasts"],
         counttypes = config["counttypes"],
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
         sample_table = config["sample_table"],
+        contrast_colors =config["contrast_colors"],
+        condition_colors =config["condition_colors"],
         repeats = config["repeats"],
+        telocalmapping = config["telocalmapping"],
         inputdir = "results/agg/deseq2",
         outputdir = "results/agg/repeatanalysis"
     conda:
@@ -772,11 +830,39 @@ rule repeatanalysis:
         "logs/agg/repeatanalysis.log"
     output:
         activeelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/activeelementContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisactiveelementContrastplot.rst", category="repeat analysis"),
-        familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/familyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
-        combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/combinedContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
+        familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/FamilyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
+        combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/CombinedContrastPlot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
+        sharedamongallcontrasts_derte = "results/agg/repeatanalysis/sharedamongallcontrasts_derte.tsv",
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
         "scripts/repeatanalysis.R"
+
+
+
+rule ideogram:
+    input:
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
+    params:
+        contrasts = config["contrasts"],
+        telocaltypes = config["telocaltypes"],
+        rtestoplot = config["rtestoplot"],
+        sample_table = config["sample_table"],
+        karyotype = config["karyotype"],
+        genedensity = config["genedensity"],
+        namedcolorlist = config["namedcolorlist"],
+        namedmarkerlist = config["namedmarkerlist"],
+        outputdir = "results/agg/repeatanalysis"
+    conda:
+        "envs/repeatanalysis.yml"
+    log:
+        "logs/agg/ideogram.log"
+    output:
+        outfile = "results/agg/repeatanalysis/ideogram_outfile.txt"
+    script:
+        "scripts/ideogram.R"
+
+
 
 rule deeptools_plotAggSignal:
     input:

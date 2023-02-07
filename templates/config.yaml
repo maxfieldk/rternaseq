@@ -31,7 +31,7 @@ levels:
   - "PRO"
   - "QUI"
   - "SEN"
-  - "3TC"
+  - "X3TC"
   - "FTC"
   - "CAS"
   - "KREB"
@@ -41,12 +41,13 @@ levelslegendmap:
   PRO: "proliferating"
   QUI: "quiescent"
   SEN: "senescent"
-  3TC: "3TC"
+  X3TC: "X3TC"
   FTC: "FTC"
   CAS: "CAS"
   KREB: "KREB"
 
 #analysis settings
+#BE SURE TO ONLY INCLUDE CONTRASTS RELATIVE  TO BASE (EG IN THIS CASE PRO. SEN VS QUI WOULD FAIL FOR INSTANCE)
 contrasts:
   - "condition_SEN_vs_PRO"
   - "condition_QUI_vs_PRO"

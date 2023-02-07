@@ -7,7 +7,7 @@
 
 # do not ignore (needed due to the above bullet point)
 !/scripts
-
+!/envs
 !/templates
 !/tools
 
