@@ -35,10 +35,10 @@ my_comma <- function(num) {
 plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", colors = c("red", "blue", "grey"), alpha = 0.9, number_to_sample = NULL, annotate_top = 0) {
     dat <- df %>% filter(.data[[classificationlevel]] == rte)
     if (is.null(number_to_sample)) {
-        arranged = dat %>% arrange(padj)
-        arranged$rank  <- row.names(arranged) 
+        arranged <- dat %>% arrange(padj)
+        arranged$rank <- row.names(arranged)
         arranged$rank <- as.integer(arranged$rank)
-        arranged = arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
+        arranged <- arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
         rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
             geom_point(aes(color = Significance)) +
             geom_abline(intercept = 0) +
@@ -50,24 +50,26 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
             theme(axis.line = element_blank()) +
-            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " ")) +    
-            geom_label_repel(data = . %>% mutate(label = ifelse(labelshow == "yes", .data[["teorgenename"]], "")),
-            aes(label = label),
-            box.padding   = 0.5, 
-            point.padding = 0.5,
-            nudge_x = -.15,
-            nudge_y = 1.5,
-            min.segment.length = 0,
-            max.overlaps = 2,
-            segment.color = 'grey50')
+            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " ")) +
+            geom_label_repel(
+                data = . %>% mutate(label = ifelse(labelshow == "yes", .data[["teorgenename"]], "")),
+                aes(label = label),
+                box.padding = 0.5,
+                point.padding = 0.5,
+                nudge_x = -.15,
+                nudge_y = 1.5,
+                min.segment.length = 0,
+                max.overlaps = 2,
+                segment.color = "grey50"
+            )
         return(rteplot)
     } else {
         number_to_sample <- min(length(rownames(dat)), number_to_sample)
         datasampled <- dat[sample(rownames(dat), number_to_sample, replace = FALSE), ]
-        arranged = datasampled %>% arrange(padj)
-        arranged$rank  <- row.names(arranged) 
+        arranged <- datasampled %>% arrange(padj)
+        arranged$rank <- row.names(arranged)
         arranged$rank <- as.integer(arranged$rank)
-        arranged = arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
+        arranged <- arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
         rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
             geom_point(aes(color = Significance)) +
             geom_abline(intercept = 0) +
@@ -79,21 +81,23 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
             theme(axis.line = element_blank()) +
-            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " ")) +    
-            geom_label_repel(data = . %>% mutate(label = ifelse(labelshow == "yes", .data[["teorgenename"]], "")),
-            aes(label = label),
-            box.padding   = 0.5, 
-            point.padding = 0.5,
-            nudge_x = -.15,
-            nudge_y = 1.5,
-            min.segment.length = 0,
-            max.overlaps = Inf,
-            segment.color = 'grey50')
+            labs(x = paste(quanttype, "counts", levelslegendmap[contrast_base_level], sep = " "), y = paste(quanttype, "counts", levelslegendmap[contrast_level_2], sep = " ")) +
+            geom_label_repel(
+                data = . %>% mutate(label = ifelse(labelshow == "yes", .data[["teorgenename"]], "")),
+                aes(label = label),
+                box.padding = 0.5,
+                point.padding = 0.5,
+                nudge_x = -.15,
+                nudge_y = 1.5,
+                min.segment.length = 0,
+                max.overlaps = Inf,
+                segment.color = "grey50"
+            )
         return(rteplot)
     }
 }
 
-plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL , valuescol = "log2FoldChange") {
+plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, valuescol = "log2FoldChange") {
     if (is.null(repeattypesallowed)) {
         df <- df %>%
             filter(.data[[classificationlevel]] != "Other")
@@ -102,7 +106,7 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL , valu
             filter(.data[["Family"]] %in% repeattypesallowed)
     }
 
-    agg = df %>%
+    agg <- df %>%
         ggplot(aes(x = .data[[classificationlevel]], y = .data[[valuescol]])) +
         geom_violin(draw_quantiles = c(0.5)) +
         stat_summary(fun = "mean", geom = "point", color = "black") +
@@ -115,11 +119,13 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL , valu
         theme(axis.line = element_blank()) +
         theme(aspect.ratio = 1)
 
-    numberxaxis = df[,classificationlevel] %>% unique() %>% length()
-    if (numberxaxis >3) {
-        agg = agg + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+    numberxaxis <- df[, classificationlevel] %>%
+        unique() %>%
+        length()
+    if (numberxaxis > 3) {
+        agg <- agg + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
     }
-    
+
     return(agg)
 }
 
@@ -222,34 +228,34 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
 
         results <- Reduce(function(x, y) merge(x, y, by = "Geneid"), dflist, accumulate = FALSE)
         results <- results %>% mutate(Significance = ifelse(padj < 0.05, ifelse(padj < 0.001, "< 0.001", "< 0.05"), "> 0.05"))
-        results = results %>% mutate(teorgenename = str_split(Geneid, ":", simplify = TRUE)[, 1])
+        results <- results %>% mutate(teorgenename = str_split(Geneid, ":", simplify = TRUE)[, 1])
         genes <- results$Geneid
 
 
         pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR")
         names(pattern) <- c("L1", "Alu", "ERVK")
-        classification = "Family"
+        classification <- "Family"
         results[classification] <- "Other"
         for (e in names(pattern)) {
             matches <- grep(pattern[[e]], genes)
             results[matches, classification] <- e
         }
 
-        pattern <- list( "L1HS:L1", "AluY:Alu", "HERVK(.)*int")
+        pattern <- list("L1HS:L1", "AluY:Alu", "HERVK(.)*int")
         names(pattern) <- c("L1HS", "AluY", "HERVK-int")
-        classification = "ActiveTE"
+        classification <- "ActiveTE"
         results[classification] <- "Other"
         for (e in names(pattern)) {
             matches <- grep(pattern[[e]], genes)
             results[matches, classification] <- e
         }
-    
-        #be sure to have the higher level in ontology first e.g L1:LINE, and lowest level last e.g. L1HS:L1
-        #So this will filter out all L1HS from L1:LINE. To get all L1:LINE, you will need to call the family level
-        #nevermind, only put same ontology in a column
+
+        # be sure to have the higher level in ontology first e.g L1:LINE, and lowest level last e.g. L1HS:L1
+        # So this will filter out all L1HS from L1:LINE. To get all L1:LINE, you will need to call the family level
+        # nevermind, only put same ontology in a column
         pattern <- list("L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
         names(pattern) <- c("L1HS", "AluY", "HERVK-int", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
-        classification = "TE"
+        classification <- "TE"
         results[classification] <- "Other"
         for (e in names(pattern)) {
             matches <- grep(pattern[[e]], genes)
@@ -268,85 +274,86 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         herv_lims <- c(-1, 11)
 
         ##### ACTIVE RTE PLOTS
-        #annotated plots
+        # annotated plots
         outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
 
-        #scatter plots
-        scatterplotsNoAnnotations = list()
-        classificationlevels = c("TE", "Family")
+        # scatter plots
+        scatterplotsNoAnnotations <- list()
+        classificationlevels <- c("TE", "Family")
         for (classificationlevel in classificationlevels) {
             print(classificationlevel)
-            types2plot = results[,classificationlevel] %>% unique()
+            types2plot <- results[, classificationlevel] %>% unique()
             for (e in types2plot) {
                 print(e)
                 if (e != "Other") {
-                    tempplot <- plotRTE(e, classificationlevel , results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 0)
-                    pdf(paste(outputdir, contrast, paste0(e,"NotAnnotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 0)
+                    pdf(paste(outputdir, contrast, paste0(e, "NotAnnotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
-                    scatterplotsNoAnnotations[[e]] = tempplot
+                    scatterplotsNoAnnotations[[e]] <- tempplot
                 }
             }
         }
 
-        scatterplotsHighlyAnnotated = list()
-        classificationlevels = c("TE", "Family")
+        scatterplotsHighlyAnnotated <- list()
+        classificationlevels <- c("TE", "Family")
         for (classificationlevel in classificationlevels) {
             print(classificationlevel)
-            types2plot = results[,classificationlevel] %>% unique()
+            types2plot <- results[, classificationlevel] %>% unique()
             for (e in types2plot) {
                 print(e)
                 if (e != "Other") {
-                    tempplot <- plotRTE(e, classificationlevel , results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 5)
-                    pdf(paste(outputdir, contrast, paste0(e,"highlyannotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 5)
+                    pdf(paste(outputdir, contrast, paste0(e, "highlyannotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
-                    scatterplotsHighlyAnnotated[[e]] = tempplot
+                    scatterplotsHighlyAnnotated[[e]] <- tempplot
                 }
             }
         }
 
-        scatterplots = list()
-        classificationlevels = c("TE", "Family")
+        scatterplots <- list()
+        classificationlevels <- c("TE", "Family")
         for (classificationlevel in classificationlevels) {
             print(classificationlevel)
-            types2plot = results[,classificationlevel] %>% unique()
+            types2plot <- results[, classificationlevel] %>% unique()
             for (e in types2plot) {
                 print(e)
                 if (e != "Other") {
-                    tempplot <- plotRTE(e, classificationlevel , results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 3)
-                    pdf(paste(outputdir, contrast, paste0(e,"annotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 3)
+                    pdf(paste(outputdir, contrast, paste0(e, "annotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
-                    scatterplots[[e]] = tempplot
+                    scatterplots[[e]] <- tempplot
                 }
             }
         }
 
-        #violin plots
-        violinplots = list()
-        classificationlevels = c("TE", "Family", "ActiveTE")
+        # violin plots
+        violinplots <- list()
+        classificationlevels <- c("TE", "Family", "ActiveTE")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel)
             pdf(paste(outputdir, contrast, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
             dev.off()
-            violinplots[[classificationlevel]] = tempplot
+            violinplots[[classificationlevel]] <- tempplot
         }
 
-        L1violinplots = list()
-        classificationlevels = c("TE")
+        L1violinplots <- list()
+        classificationlevels <- c("TE")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel, repeattypesallowed = c("L1"))
             pdf(paste(outputdir, contrast, paste0("AggL1", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
             dev.off()
-            L1violinplots[[classificationlevel]] = tempplot
+            L1violinplots[[classificationlevel]] <- tempplot
         }
 
 
-        ### cow plots
-        #Active RTE
+        ########### cow plots
+        ###### First with annotations
+        # Active RTE
         legend <- get_legend(scatterplots[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
         p <- plot_grid(violinplots[["ActiveTE"]] + theme(legend.position = "none"),
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
@@ -357,7 +364,7 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
             align = "vh",
             axis = "bt"
         )
-        p = plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         pdf(paste(outputdir, contrast, paste0("activeelementContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
@@ -373,10 +380,11 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
             align = "vh",
             axis = "bt"
         )
-        p = plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         pdf(paste(outputdir, contrast, paste0("FamilyContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
+
 
         ########## Plot activete and family together
         legend <- get_legend(scatterplots[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
@@ -393,7 +401,7 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
             align = "vh",
             axis = "bt"
         )
-        p = plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         pdf(paste(outputdir, contrast, paste0("CombinedContrastPlot", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
@@ -413,10 +421,87 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
             align = "vh",
             axis = "bt"
         )
-        p = plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         pdf(paste(outputdir, contrast, paste0("CombinedContrastPlotL1", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
+
+
+        ############## Same together plots but without the annotations
+        # Active RTE
+        legend <- get_legend(scatterplotsNoAnnotations[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
+        p <- plot_grid(violinplots[["ActiveTE"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["AluY"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["HERVK-int"]] + theme(legend.position = "none"),
+            nrow = 1,
+            rel_widths = c(1, 1, 1, 1), labels = "AUTO",
+            align = "vh",
+            axis = "bt"
+        )
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        pdf(paste(outputdir, contrast, paste0("activeelementContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
+        print(p)
+        dev.off()
+
+        # Family
+        legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
+        p <- plot_grid(violinplots[["Family"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["Alu"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["ERVK"]] + theme(legend.position = "none"),
+            nrow = 1,
+            rel_widths = c(1, 1, 1, 1), labels = "AUTO",
+            align = "vh",
+            axis = "bt"
+        )
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        pdf(paste(outputdir, contrast, paste0("FamilyContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
+        print(p)
+        dev.off()
+
+
+        ########## Plot activete and family together
+        legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
+        p <- plot_grid(violinplots[["Family"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["Alu"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["ERVK"]] + theme(legend.position = "none"),
+            violinplots[["ActiveTE"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["AluY"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["HERVK-int"]] + theme(legend.position = "none"),
+            nrow = 2,
+            rel_widths = c(1, 1, 1, 1), labels = "AUTO",
+            align = "vh",
+            axis = "bt"
+        )
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        pdf(paste(outputdir, contrast, paste0("CombinedContrastPlotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
+        print(p)
+        dev.off()
+
+        ########## L1 together plot
+        legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
+        p <- plot_grid(L1violinplots[["TE"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1PA2"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1PA3"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1PA4"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1PA5"]] + theme(legend.position = "none"),
+            scatterplotsNoAnnotations[["L1PA6-9"]] + theme(legend.position = "none"),
+            nrow = 2,
+            rel_widths = c(1, 1, 1, 1), labels = "AUTO",
+            align = "vh",
+            axis = "bt"
+        )
+        p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
+        pdf(paste(outputdir, contrast, paste0("CombinedContrastPlotL1NoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
+        print(p)
+        dev.off()
+
+
         ################################################ END#PLOTING
     }
 }
@@ -445,10 +530,10 @@ for (counttype in snakemake@params[["counttypes"]]) {
         DOWN[[gsub("condition_", "", contrast)]] <- dfDOWN
     }
     fit <- euler(UP, shape = "ellipse")
-    upplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors,main = "UP", legend = FALSE)
+    upplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors, main = "UP", legend = FALSE)
 
     fit <- euler(DOWN, shape = "ellipse")
-    downplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors,main = "DOWN", legend = FALSE)
+    downplot <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors, main = "DOWN", legend = FALSE)
     legd <- makeLegendGrob(gsub("condition_", "", contrasts))
 
     plots <- list(upplot, downplot)
@@ -610,18 +695,19 @@ for (direction in c("UP", "DOWN")) {
                 contrast_lengths <- c(contrast_lengths, length(thing))
             }
             overlap <- length(shared_des_master[[direction]][[telocaltype]][[e]])
-
-            significance <- phyper(overlap - 1, contrast_lengths[2], ntotal - contrast_lengths[2], contrast_lengths[1], lower.tail = FALSE)
             if (length(contrasts) > 2) {
-                significance <- NULL
+                significance <- 75
+            } else {
+                significance <- phyper(overlap - 1, contrast_lengths[2], ntotal - contrast_lengths[2], contrast_lengths[1], lower.tail = FALSE)
             }
+
             vec <- list(telocaltype, e, significance, ntotal, direction)
             sigdf[i, ] <- vec
             i <- i + 1
         }
     }
 }
-sigdf <- sigdf %>% mutate(sigcode = ifelse(sig > 0.05, "NS", ifelse(sig > 0.01, "*", ifelse(sig > 0.001, "**", "***"))))
+sigdf <- sigdf %>% mutate(sigcode = ifelse(sig == 75, " ", ifelse(sig > 0.05, "NS", ifelse(sig > 0.01, "*", ifelse(sig > 0.001, "**", "***")))))
 
 
 ###########################
@@ -649,22 +735,22 @@ for (direction in c("UP", "DOWN")) {
             }
             fit <- euler(contrastL, shape = "ellipse")
             p <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors, main = paste(rte, direction, sep = " "), legendcex = 1)
-            sig <- sigdf[sigdf$counttype == counttype & sigdf$element == e & sigdf$direction == direction, ]$sigcode
-            if (sig == "NS") {
-                size = 4
+            sigcode <- sigdf[sigdf$counttype == counttype & sigdf$element == e & sigdf$direction == direction, ]$sigcode
+            if (sigcode == "NS") {
+                size <- 4
             } else {
-                size = 15
+                size <- 15
             }
             universe <- sigdf[sigdf$counttype == counttype & sigdf$element == e & sigdf$direction == direction, ]$universe
             pl <- ggdraw(p) +
-                annotate("text", label = sig, x = Inf, y = Inf, vjust = 1, hjust = 1, size = size) +
+                annotate("text", label = sigcode, x = Inf, y = Inf, vjust = 1, hjust = 1, size = size) +
                 annotate("text", label = paste0("\nU: ", my_comma(universe)), x = Inf, y = Inf, vjust = 1, hjust = 1, size = 4)
             pdf(paste(outputdir, paste0("VennDiagram", rte, direction, ".pdf"), sep = "/"), width = 4, height = 4)
             print(pl)
             dev.off()
             p_no_title <- euPlot(fit, contrasts, main = rte, fill = contrast_colors, legend = FALSE)
             plnotitle <- ggdraw(p_no_title) +
-                annotate("text", label = sig, x = Inf, y = Inf, vjust = 1, hjust = 1, size = size) +
+                annotate("text", label = sigcode, x = Inf, y = Inf, vjust = 1, hjust = 1, size = size) +
                 annotate("text", label = paste0("\nU: ", my_comma(universe)), x = Inf, y = Inf, vjust = 1, hjust = 1, size = 4)
             plots[[e]] <- plnotitle
         }
