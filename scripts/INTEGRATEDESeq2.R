@@ -83,7 +83,7 @@ for (counttype in counttypes) {
 
     pcaplot <- biplot(pcaObj,
         showLoadings = FALSE, gridlines.major = FALSE, gridlines.minor = FALSE, borderWidth = 0,
-        colby = "condition", legendPosition = "right",
+        colby = "condition", shape = "batch", legendPosition = "right",
         labSize = 5, pointSize = 5, sizeLoadingsNames = 5
     )
     pcap <- pcaplot +
@@ -136,6 +136,24 @@ for (counttype in counttypes) {
     print(pcaplot_statelipse)
     dev.off()
 
+    # PCA with batch effect removed
+
+    vst_batchcorrected <- limma::removeBatchEffect(vst, colData(dds)$batch)
+
+    pcaObj_batchcorrected <- pca(vst_batchcorrected, metadata = colData(dds), removeVar = 0.1)
+
+    pcaplot <- biplot(pcaObj_batchcorrected,
+        showLoadings = FALSE, gridlines.major = FALSE, gridlines.minor = FALSE, borderWidth = 0,
+        colby = "condition", shape = "batch", legendPosition = "right",
+        labSize = 5, pointSize = 5, sizeLoadingsNames = 5
+    )
+    pcap <- pcaplot +
+        theme_cowplot() +
+        theme(axis.line = element_blank(), aspect.ratio = 1, panel.border = element_rect(color = "black", linetype = 1, linewidth = 1, fill = NA))
+
+    pdf(paste(outputdir, counttype, "plots", "pcaplot_batchcorrected.pdf", sep = "/"), width = 7, height = 6)
+    print(pcap)
+    dev.off()
 
     ############
 

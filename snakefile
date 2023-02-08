@@ -1049,9 +1049,17 @@ rule INTEGRATEDEseq2:
     conda: "envs/renv.yml"
     log: "logs/agg/DEseq2.log"
     output:
-        results = expand("results/agg/deseq2/{counttype}/{contrast}/INTEGRATE_{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
+        results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
         outfile = "results/agg/deseq2/INTEGRATE_outfile.txt"
     script:
         "scripts/INTEGRATEDESeq2.R"
 
 
+rule INTEGRATEdetermineSharedDeTes:
+    params:
+        peptable = "conf/peptable.csv",
+    conda: "envs/repeatanalysis.yml"
+    output:
+        outfile = "outfile_sharedetes.txt"
+    notebook:
+        "scripts/INTEGRATEanalyzeDERTEs.ipynb"

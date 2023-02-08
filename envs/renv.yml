@@ -5,12 +5,17 @@ channels:
  - defaults
 dependencies:
  - r-base=4.1.1
+ - ipykernel
+ - jupyter
+ - r-irkernel
  - r-tibble
  - r-readr
  - r-dplyr
  - r-ggplot2
+ - r-magrittr
  - r-pheatmap
  - r-cowplot
  - bioconductor-DESeq2
  - bioconductor-GenomicFeatures
  - bioconductor-PCAtools
+ - bioconductor-limma
