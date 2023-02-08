@@ -3,8 +3,11 @@ sample_table: "conf/sample_table.csv"
 #tools
 trimmomaticdir: tools/Trimmomatic-0.39
 
+#genomes
+hs1sorted: "/users/mkelsey/data/ref/genomes/hs1/hs1.sorted.fa"
 #indeces
 locindTElocal: "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd"
+telocalmapping: "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd.locations"
 bowtie2hs1index: "/users/mkelsey/data/ref/genomes/hs1/hs1.sorted_bowtie2/hs1"
 starindex: "/users/mkelsey/data/ref/genomes/hs1/STARindex"
 
@@ -29,28 +32,13 @@ telocalstrandparam: "reverse"
 #order matters for levels! first is the base comparator
 levels:
   - "PRO"
-  - "QUI"
-  - "SEN"
-  - "X3TC"
-  - "FTC"
-  - "CAS"
-  - "KREB"
-
-#mappings
-levelslegendmap:
-  PRO: "proliferating"
-  QUI: "quiescent"
-  SEN: "senescent"
-  X3TC: "X3TC"
-  FTC: "FTC"
-  CAS: "CAS"
-  KREB: "KREB"
+  - "ESEN"
+  - "LSEN"
 
 #analysis settings
-#BE SURE TO ONLY INCLUDE CONTRASTS RELATIVE  TO BASE (EG IN THIS CASE PRO. SEN VS QUI WOULD FAIL FOR INSTANCE)
 contrasts:
-  - "condition_SEN_vs_PRO"
-  - "condition_QUI_vs_PRO"
+  - "condition_ESEN_vs_PRO"
+  - "condition_LSEN_vs_PRO"
 counttypes:
   - "star"
   - "telocal_multi"
@@ -59,4 +47,53 @@ telocaltypes:
   - "telocal_multi"
   - "telocal_uniq"
 
+#mappings
+levelslegendmap:
+  PRO: "proliferating"
+  ESEN: "early senescent"
+  LSEN: "late senescent"
 
+#note that I ommit condition_ since for most plotting applications, this helps with labelling
+contrast_colors:
+  ESEN_vs_PRO: "blue"
+  LSEN_vs_PRO: "red"
+
+condition_colors:
+  PRO: "green"
+  ESEN: "blue"
+  LSEN: "red"
+
+#these are for the ideogram
+namedcolorlist:
+  L1UP: "8c00ff"
+  AluUP: "ff9d00"
+  ERVKUP: "ff7be2"
+  L1HSUP: "8c00ff"
+  AluYUP: "ff9d00"
+  HERVK-intUP: "ff7be2"
+  L1DOWN: "00ff62"
+  AluDOWN: "0be7e4"
+  ERVKDOWN: "8c00ff"
+  L1HSDOWN: "00ff62"
+  AluYDOWN: "0be7e4"
+  HERVK-intDOWN: "8c00ff"
+
+namedmarkerlist:
+  L1: "circle"
+  Alu: "box"
+  ERVK: "triange"
+  L1HS: "circle"
+  AluY: "box"
+  HERVK-int: "triangle"
+
+rtestoplot:
+  - "L1HS"
+  - "AluY"
+  - "HERVK-int"
+
+genedensity:
+  L1HS: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.L1HS.density.bed4"
+  AluY: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.HERVK.density.bed4"
+  HERVK-int: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.AluY.density.bed4"
+
+karyotype: "/users/mkelsey/data/ref/genomes/hs1/karyotype.tsv"
