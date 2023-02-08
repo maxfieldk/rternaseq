@@ -35,6 +35,8 @@ container: "docker://maxfieldkelsey/snakesenescence:latest"
 #samples = ['SRR6515351', 'SRR6515354']
 samples = pep.sample_table.sample_name
 peptable = pep.sample_table
+import csv
+peptable.to_csv("conf/peptable.csv", index = False, quoting=csv.QUOTE_NONNUMERIC)
 
 rule all:
     input:
@@ -1039,7 +1041,7 @@ rule INTEGRATEDEseq2:
         telocal_multi = "outs/agg/INTEGRATE_TElocalCounts_multi.txt",
         telocal_uniq = "outs/agg/INTEGRATE_TElocalCounts_uniq.txt",
     params:
-        sample_table = config["sample_table"],
+        peptable = "conf/peptable.csv",
         contrasts = config["contrasts"],
         counttypes = config["counttypes"],
         levels = config["levels"],
