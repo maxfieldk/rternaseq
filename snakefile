@@ -1055,11 +1055,15 @@ rule INTEGRATEDEseq2:
         "scripts/INTEGRATEDESeq2.R"
 
 
+#be sure to order the contrasts if there are multiple by the one whose naming scheme is respected in this project
 rule INTEGRATEdetermineSharedDeTes:
     params:
         peptable = "conf/peptable.csv",
+        outputdir = "results/agg/deseq2",
+        telocaltypes = config["telocaltypes"],
+        contraststocompare = ["condition_SEN_vs_PRO", "condition_LSEN_vs_PRO"]
     conda: "envs/repeatanalysis.yml"
     output:
         outfile = "outfile_sharedetes.txt"
-    notebook:
-        "scripts/INTEGRATEanalyzeDERTEs.ipynb"
+    script:
+        "scripts/INTEGRATEanalyzeDERTEs.R"
