@@ -2,7 +2,6 @@ log <- file(snakemake@log[[1]], open="wt")
 sink(log)
 
 
-
 library('DESeq2')
 library('readr')
 library('dplyr')
@@ -11,8 +10,8 @@ library("ggplot2")
 library('tibble')
 library("RColorBrewer")
 library("cowplot")
-library("PCAtools")
 
+save.image()
 
 ### inputs
 
@@ -37,7 +36,7 @@ for (counttype in counttypes) {
     colnames(cts) <- coldata$sample_name
     dds <- DESeqDataSetFromMatrix(countData = cts,
                                 colData = coldata,
-                                design= ~ condition)
+                                design= ~ batch + condition)
     keep <- rowSums(counts(dds)) >= 10
     dds <- dds[keep,]
     #this sets prol as the reference level since its first in the vector
