@@ -987,3 +987,65 @@ rule allplots:
         des2 = "results/agg/deseq2/outfile.txt"
     output:
         "allplotsDONE{sample}.txt"
+
+
+
+rule INTEGRATEfeatureCounts:
+    input:
+        sortedSTARbams = expand("../senescence/outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples) + expand("../arna/outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples)
+    output:
+        countsmessy = "outs/agg/refseq.counts_messy.txt",
+        counts = "outs/agg/refseq.counts.txt",
+        metafeaturecounts = "outs/agg/refseq.metafeature.counts.txt"
+    params: 
+        gtf = config['refseq']
+    log: "logs/agg/featureCounts.log"
+    conda:
+        "envs/deeptools.yml"
+    threads: 2
+    shell: 
+        """
+featureCounts -p -T {threads} -t exon -a {params.gtf} -o {output.countsmessy} {input.sortedSTARbams} 2> {log}
+cut -f1,7- {output.countsmessy} | awk 'NR > 1' > {output.counts}
+featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
+        """
+
+
+rule INTEGRATEmergeTElocal:
+    input:
+        telocalMULTIsource1 = expand("../senescence/outs/{sample}/TElocal/{sample}_multi.cntTable", sample = samples),
+        telocalMULTIsource2 = expand("../arna/outs/{sample}/TElocal/{sample}_multi.cntTable", sample = samples),
+
+        telocalUNIQUEsource1 = expand("../senescence/outs/{sample}/TElocal/{sample}_uniq.cntTable", sample = samples)
+        telocalUNIQUEsource2 = expand("../arna/outs/{sample}/TElocal/{sample}_uniq.cntTable", sample = samples)
+    params:
+        sampleinfo = config["sample_table"]
+    conda: "envs/renv.yml"
+    log: "logs/agg/mergeTElocal.log"
+    output:
+        aggcountsMULTI = "outs/agg/TElocalCounts_MULTI.txt",
+        aggcountsUNIQUE = "outs/agg/TElocalCounts_UNIQUE.txt"
+    script:
+        "scripts/mergeTEdf.R"    
+
+
+rule INTEGRATEDEseq2:
+    input:
+        star = "outs/agg/refseq.counts.txt",
+        telocal_multi = "outs/agg/TElocalCounts_multi.txt",
+        telocal_uniq = "outs/agg/TElocalCounts_uniq.txt",
+    params:
+        sample_table = config["sample_table"],
+        contrasts = config["contrasts"],
+        counttypes = config["counttypes"],
+        levels = config["levels"],
+        outputdir = "results/agg/deseq2"
+    conda: "envs/renv.yml"
+    log: "logs/agg/DEseq2.log"
+    output:
+        results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
+        outfile = "results/agg/deseq2/outfile.txt"
+    script:
+        "scripts/INTEGRATEDESeq2.R"
+
+
