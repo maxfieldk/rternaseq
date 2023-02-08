@@ -17,7 +17,6 @@ library("PCAtools")
 ### inputs
 
 counttypes = snakemake@params[["counttypes"]]
-counttype = 'star'
 for (counttype in counttypes) {
     print(counttype)
     cts = read.delim(snakemake@input[[counttype]])

@@ -989,14 +989,20 @@ rule allplots:
         "allplotsDONE{sample}.txt"
 
 
+#####################################################################################For the integration project only
 
+arnasamples = peptable[peptable.batch == "alexandra"].sample_name
+marco2samples = peptable[peptable.batch == "marco2"].sample_name
+nat2019samples = peptable[peptable.batch == "nat2019"].sample_name
+
+### BE SURE to order samples in the input according to their order in the sample_table.csv
 rule INTEGRATEfeatureCounts:
     input:
-        sortedSTARbams = expand("../senescence/outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples) + expand("../arna/outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples)
+        sortedSTARbams = expand("/users/mkelsey/data/arna/outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = arnasamples) + expand("/users/mkelsey/data/senescence/outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = marco2samples) + expand("/users/mkelsey/data/marco/outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = nat2019samples)
     output:
-        countsmessy = "outs/agg/refseq.counts_messy.txt",
-        counts = "outs/agg/refseq.counts.txt",
-        metafeaturecounts = "outs/agg/refseq.metafeature.counts.txt"
+        countsmessy = "outs/agg/INTEGRATE_refseq.counts_messy.txt",
+        counts = "outs/agg/INTEGRATE_refseq.counts.txt",
+        metafeaturecounts = "outs/agg/INTEGRATE_refseq.metafeature.counts.txt"
     params: 
         gtf = config['refseq']
     log: "logs/agg/featureCounts.log"
@@ -1010,30 +1016,28 @@ cut -f1,7- {output.countsmessy} | awk 'NR > 1' > {output.counts}
 featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
         """
 
-
+### BE SURE to order samples in the input according to their order in the sample_table.csv
 rule INTEGRATEmergeTElocal:
     input:
-        telocalMULTIsource1 = expand("../senescence/outs/{sample}/TElocal/{sample}_multi.cntTable", sample = samples),
-        telocalMULTIsource2 = expand("../arna/outs/{sample}/TElocal/{sample}_multi.cntTable", sample = samples),
-
-        telocalUNIQUEsource1 = expand("../senescence/outs/{sample}/TElocal/{sample}_uniq.cntTable", sample = samples)
-        telocalUNIQUEsource2 = expand("../arna/outs/{sample}/TElocal/{sample}_uniq.cntTable", sample = samples)
+        telocal_multi = expand("/users/mkelsey/data/arna/outs/{sample}/TElocal/{sample}_multi.cntTable", sample = arnasamples) + expand("/users/mkelsey/data/senescence/outs/{sample}/TElocal/{sample}_multi.cntTable", sample = marco2samples) + expand("/users/mkelsey/data/marco/outs/{sample}/TElocal/{sample}_multi.cntTable", sample = nat2019samples),
+        telocal_uniq =  expand("/users/mkelsey/data/arna/outs/{sample}/TElocal/{sample}_uniq.cntTable", sample = arnasamples) + expand("/users/mkelsey/data/senescence/outs/{sample}/TElocal/{sample}_uniq.cntTable", sample = marco2samples) + expand("/users/mkelsey/data/marco/outs/{sample}/TElocal/{sample}_uniq.cntTable", sample = nat2019samples)
     params:
-        sampleinfo = config["sample_table"]
+        sample_table = config["sample_table"],
+        telocaltypes = config["telocaltypes"]
     conda: "envs/renv.yml"
-    log: "logs/agg/mergeTElocal.log"
+    log: "logs/agg/INTEGRATEmergeTElocal.log"
     output:
-        aggcountsMULTI = "outs/agg/TElocalCounts_MULTI.txt",
-        aggcountsUNIQUE = "outs/agg/TElocalCounts_UNIQUE.txt"
+        telocal_multi = "outs/agg/INTEGRATE_TElocalCounts_multi.txt",
+        telocal_uniq = "outs/agg/INTEGRATE_TElocalCounts_uniq.txt"
     script:
-        "scripts/mergeTEdf.R"    
+        "scripts/INTEGRATEmergeTEdf.R"    
 
 
 rule INTEGRATEDEseq2:
     input:
-        star = "outs/agg/refseq.counts.txt",
-        telocal_multi = "outs/agg/TElocalCounts_multi.txt",
-        telocal_uniq = "outs/agg/TElocalCounts_uniq.txt",
+        star = "outs/agg/INTEGRATE_refseq.counts.txt",
+        telocal_multi = "outs/agg/INTEGRATE_TElocalCounts_multi.txt",
+        telocal_uniq = "outs/agg/INTEGRATE_TElocalCounts_uniq.txt",
     params:
         sample_table = config["sample_table"],
         contrasts = config["contrasts"],
@@ -1043,8 +1047,8 @@ rule INTEGRATEDEseq2:
     conda: "envs/renv.yml"
     log: "logs/agg/DEseq2.log"
     output:
-        results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
-        outfile = "results/agg/deseq2/outfile.txt"
+        results = expand("results/agg/deseq2/{counttype}/{contrast}/INTEGRATE_{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
+        outfile = "results/agg/deseq2/INTEGRATE_outfile.txt"
     script:
         "scripts/INTEGRATEDESeq2.R"
 
