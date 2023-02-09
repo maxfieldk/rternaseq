@@ -511,29 +511,6 @@ featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -B -O -a {par
 cut -f1,7- {output.countsstrandnonspecificmessy} | awk 'NR > 1' > {output.countsstrandnonspecific}
 featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
         """
-
-rule featureCounts2:
-    input:
-        sortedSTARbams = expand("outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples)
-    output:
-        metafeaturecounts = "test/metafeature.counts.txt"
-    params: 
-        refseq = 
-        featureCountsstrandparam = config['featureCountsstrandparam']
-    log: "logs/agg/featureCounts.log"
-    conda:
-        "envs/deeptools.yml"
-    threads: 4
-    shell: 
-        """
-featureCounts -p -s {params.featureCountsstrandparam} -T 4 -B -O -a {params.refseq}\
-    -o test/metafeature.counts.txt\
-    /users/mkelsey/data/senescence/outs/PRO1/star_output/PRO1.STAR.sorted.bam
- """
-
-
-
-
 #######################################################################
 # deeptools plots
 #######################################################################
@@ -1019,10 +996,14 @@ rule allplots:
 
 
 #####################################################################################For the integration project only
-
-arnasamples = peptable[peptable.batch == "alexandra"].sample_name
-marco2samples = peptable[peptable.batch == "marco2"].sample_name
-nat2019samples = peptable[peptable.batch == "nat2019"].sample_name
+try:
+    arnasamples = peptable[peptable.batch == "alexandra"].sample_name
+    marco2samples = peptable[peptable.batch == "marco2"].sample_name
+    nat2019samples = peptable[peptable.batch == "nat2019"].sample_name
+except:
+    arnasamples = "a"
+    marco2samples = "a"
+    nat2019samples = "a"
 
 ### BE SURE to order samples in the input according to their order in the sample_table.csv
 rule INTEGRATEfeatureCounts:
