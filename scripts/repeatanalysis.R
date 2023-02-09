@@ -21,6 +21,7 @@ library("org.Hs.eg.db")
 library("ggrepel")
 save.image()
 
+peptable <- read.csv(snakemake@params[["peptable"]])
 # order matters for the colors!
 contrast_colors <- snakemake@params[["contrast_colors"]]
 contrast_colors <- unname(unlist(contrast_colors))
@@ -189,7 +190,8 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         colnames(ddscounts)[1] <- "Geneid"
         colnames(ddsrlogcounts)[1] <- "Geneid"
 
-        sample_table <- read.csv(snakemake@params[["sample_table"]])
+
+        
 
         avoidzero <- 1
         meancols <- c()
@@ -197,7 +199,7 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         rlogmeancols <- c()
 
         for (condition in conditions) {
-            condition_samples <- filter(sample_table, condition == {{ condition }})$sample_name
+            condition_samples <- filter(peptable, condition == {{ condition }})$sample_name
             s <- ""
             for (e in condition_samples) {
                 if (s == "") {
@@ -695,10 +697,10 @@ for (direction in c("UP", "DOWN")) {
                 contrast_lengths <- c(contrast_lengths, length(thing))
             }
             overlap <- length(shared_des_master[[direction]][[telocaltype]][[e]])
-            if (length(contrasts) > 2) {
-                significance <- 75
-            } else {
+            if (length(contrasts) == 2 ) {
                 significance <- phyper(overlap - 1, contrast_lengths[2], ntotal - contrast_lengths[2], contrast_lengths[1], lower.tail = FALSE)
+            } else {
+                significance <- 75
             }
 
             vec <- list(telocaltype, e, significance, ntotal, direction)

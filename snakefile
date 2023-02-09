@@ -846,7 +846,7 @@ rule repeatanalysis:
         counttypes = config["counttypes"],
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
-        sample_table = config["sample_table"],
+        peptable = "conf/peptable.csv",
         contrast_colors =config["contrast_colors"],
         condition_colors =config["condition_colors"],
         repeats = config["repeats"],
@@ -1094,3 +1094,34 @@ rule INTEGRATEdetermineSharedDeTes:
         outfile = "outfile_sharedetes.txt"
     script:
         "scripts/INTEGRATEanalyzeDERTEs.R"
+
+
+rule INTEGRATErepeatanalysis:
+    input:
+        deseq = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
+        telocal = expand("outs/agg/INTEGRATE_TElocalCounts_{maptype}.txt", sample = samples, maptype = ["multi", "uniq"])
+    params:
+        contrasts = config["contrasts"],
+        counttypes = config["counttypes"],
+        telocaltypes = config["telocaltypes"],
+        levelslegendmap = config["levelslegendmap"],
+        peptable = "conf/peptable.csv",
+        contrast_colors =config["contrast_colors"],
+        condition_colors =config["condition_colors"],
+        repeats = config["repeats"],
+        telocalmapping = config["telocalmapping"],
+        inputdir = "results/agg/deseq2",
+        outputdir = "results/agg/repeatanalysis"
+    conda:
+        "envs/repeatanalysis.yml"
+    log:
+        "logs/agg/repeatanalysis.log"
+    output:
+        activeelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/activeelementContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisactiveelementContrastplot.rst", category="repeat analysis"),
+        familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/FamilyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
+        combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/CombinedContrastPlot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
+        sharedamongallcontrasts_derte = "results/agg/repeatanalysis/sharedamongallcontrasts_derte.tsv",
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
+        outfile = "results/agg/repeatanalysis/INTEGRATEoutfile.txt"
+    script:
+        "scripts/repeatanalysis.R"
