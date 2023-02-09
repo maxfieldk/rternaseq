@@ -264,6 +264,7 @@ LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 \
 2> {log}
         """
 
+###################### Bowtie2
 rule AlignBowtie2:
     input:
         r1 = "rawdata/{sample}_1.trimmed.fastq.gz",
@@ -280,6 +281,52 @@ rule AlignBowtie2:
         "envs/deeptools.yml"
     shell:
         "bowtie2 -x {params.index} -1 {input.r1} -2 {input.r2} -S {output.sam} --threads {threads} > {log.out} 2> {log.err}"
+
+rule samtobam:
+    input:
+        sam = "outs/{sample}/{sample}.sam"
+    output:
+        bam = temp("outs/{sample}/{sample}.bam")
+    threads: 4
+    conda:
+        "envs/deeptools.yml"
+    shell:
+        "samtools view -S -b {input.sam} > {output.bam}"
+
+rule sortbams:
+    input:
+        bam = "outs/{sample}/{sample}.bam"
+    output:
+        sortedbam = "outs/{sample}/{sample}.sorted.bam"
+    threads: 4
+    conda:
+        "envs/deeptools.yml"
+    shell: "samtools sort {input.bam} -o {output.sortedbam}"
+
+rule indexsortedbam:
+    input:
+        sortedbam = "outs/{sample}/{sample}.sorted.bam"
+    log: "logs/{sample}/indexsortedbam.log"
+    output:
+        bamindex = "outs/{sample}/{sample}.sorted.bam.bai"
+    threads: 4
+    conda:
+        "envs/deeptools.yml"
+    shell: "samtools index {input.sortedbam} 2> {log}"
+
+rule bamstats:
+    input:
+        bam = "outs/{sample}/{sample}.sorted.bam"
+    output:
+        bamstats = "outs/{sample}/{sample}.bam.sorted.stats.txt"
+    threads: 4
+    conda:
+        "envs/deeptools.yml"
+    shell:
+        "samtools stats {input.bam} > {output.bamstats}"
+
+############ STAR
+
 
 rule alignSTAR:
     input:
@@ -326,51 +373,8 @@ rule indexsortedSTARbam:
     shell: "samtools index {input.sortedbamSTAR} 2> {log}"
 
 
-rule samtobam:
-    input:
-        sam = "outs/{sample}/{sample}.sam"
-    output:
-        bam = temp("outs/{sample}/{sample}.bam")
-    threads: 4
-    conda:
-        "envs/deeptools.yml"
-    shell:
-        "samtools view -S -b {input.sam} > {output.bam}"
-
-rule sortbams:
-    input:
-        bam = "outs/{sample}/{sample}.bam"
-    output:
-        sortedbam = "outs/{sample}/{sample}.sorted.bam"
-    threads: 4
-    conda:
-        "envs/deeptools.yml"
-    shell: "samtools sort {input.bam} -o {output.sortedbam}"
-
-rule indexsortedbam:
-    input:
-        sortedbam = "outs/{sample}/{sample}.sorted.bam"
-    log: "logs/{sample}/indexsortedbam.log"
-    output:
-        bamindex = "outs/{sample}/{sample}.sorted.bam.bai"
-    threads: 4
-    conda:
-        "envs/deeptools.yml"
-    shell: "samtools index {input.sortedbam} 2> {log}"
-
-rule bamstats:
-    input:
-        bam = "outs/{sample}/{sample}.sorted.bam"
-    output:
-        bamstats = "outs/{sample}/{sample}.bam.sorted.stats.txt"
-    threads: 4
-    conda:
-        "envs/deeptools.yml"
-    shell:
-        "samtools stats {input.bam} > {output.bamstats}"
-
 #######################################################################
-#t2t style analysis of repeats
+#Bowtie based alignment stats
 #######################################################################
 rule repeatCounts:
     input:
@@ -507,6 +511,29 @@ featureCounts -p -s {params.featureCountsstrandparam} -T {threads} -B -O -a {par
 cut -f1,7- {output.countsstrandnonspecificmessy} | awk 'NR > 1' > {output.countsstrandnonspecific}
 featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts} {input.sortedSTARbams} 2>> {log}
         """
+
+rule featureCounts2:
+    input:
+        sortedSTARbams = expand("outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples)
+    output:
+        metafeaturecounts = "test/metafeature.counts.txt"
+    params: 
+        refseq = 
+        featureCountsstrandparam = config['featureCountsstrandparam']
+    log: "logs/agg/featureCounts.log"
+    conda:
+        "envs/deeptools.yml"
+    threads: 4
+    shell: 
+        """
+featureCounts -p -s {params.featureCountsstrandparam} -T 4 -B -O -a {params.refseq}\
+    -o test/metafeature.counts.txt\
+    /users/mkelsey/data/senescence/outs/PRO1/star_output/PRO1.STAR.sorted.bam
+ """
+
+
+
+
 #######################################################################
 # deeptools plots
 #######################################################################

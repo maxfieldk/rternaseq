@@ -8,7 +8,6 @@ dependencies:
   - r-base=4.2.2
   - r-magrittr
   - r-stringr
-  - r-stringr
   - r-cowplot
   - r-ggplot2
   - r-ggridges

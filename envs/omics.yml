@@ -1,0 +1,37 @@
+name: omics
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - jupyter
+  - ipykernel
+  - ipython
+  - bowtie2
+  - python=3.8
+  - bedtools
+  - pygenometracks
+  - deeptools
+  - cgatcore
+  - cgat-apps
+  - r-base=4.1
+  - r-irkernel
+  - r-tibble
+  - r-stringr
+  - r-readr
+  - r-dplyr
+  - r-ggplot2
+  - r-magrittr
+  - r-pheatmap
+  - r-cowplot
+  - r-httpgd
+  - r-RColorBrewer
+  - r-eulerr
+  - r-RIdeogram
+  - r-ggvenndiagram
+  - r-ggrepel
+  - bioconductor-DESeq2
+  - bioconductor-GenomicFeatures
+  - bioconductor-PCAtools
+  - bioconductor-limma
