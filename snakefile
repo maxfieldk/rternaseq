@@ -754,65 +754,26 @@ rule pyGenomeTracks:
         "scripts/pygenometracks.sh"
 
 
-#         """
-# make_tracks_file --trackFiles \
-# {params.l1hs6kbintactbed} \
-# {input.bw} \
-# {params.repeatsbed} \
-# -o {params.outputdir}/atracks.ini 2> {log}
-
-# #modify tracks ini file to show labels
-# #I set the max height for all rna tracks to 50
-# sed 's/labels = false/labels = true/g' {params.outputdir}/atracks.ini > {params.outputdir}/atracksMOD1.ini
-# sed 's/#overlay_previous = yes/overlay_previous = share-y/g' {params.outputdir}/atracksMOD1.ini > {params.outputdir}/atracksMOD2.ini
-# sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD2.ini > {params.outputdir}/atracksMOD3.ini
-# sed 's/overlay_previous = share-y/#overlay_previous = yes/1' {params.outputdir}/atracksMOD3.ini > {params.outputdir}/atracksMOD4.ini
-# sed 's/#max_value = auto/max_value = 50/1' {params.outputdir}/atracksMOD4.ini > {params.outputdir}/atracksMOD.ini
-
-
-# #manually modify tracks to show labels
-# for telocaltype in {params.telocaltypes}
-# do
-# for contrast in {params.contrasts}
-# do
-# cat {input.DETEsbyContrast} | while read line
-# do
-# tetype=$(awk '{{print $1}}' <<< $line)
-# te=$(awk '{{print $2}}' <<< $line)
-# chr=$(awk '{{print $3}}' <<< $line)
-# start=$(awk '{{print $4}}' <<< $line)
-# stop=$(awk '{{print $5}}' <<< $line)
-# strand=$(awk '{{print $6}}' <<< $line)
-# direction=$(awk '{{print $7}}' <<< $line)
-# counttype=$(awk '{{print $9}}' <<< $line)
-# contrasttype=$(awk '{{print $8}}' <<< $line)
-# echo $chr $start $stop
-
-# if [ $tetype == AluY ]
-# then
-# flanklength=200
-# elif [ $tetype == L1HS ]
-# then
-# flanklength=1000
-# else
-# flanklength=1000
-# fi
-
-# echo $tetype
-# echo $flanklength
-
-# if [ $counttype == $telocaltype ] && [ $contrasttype == $contrast]
-# then
-# pyGenomeTracks --tracks {params.outputdir}/atracksMOD.ini --region ${{chr}}:$((${{start}}-${{flanklength}}))-$((${{stop}}+${{flanklength}})) \
-# --dpi 300 --title ${{te}} -o {params.outputdir}/${{telocaltype}}/${{contrast}}/${{te}}${{chr}}${{start}}${{stop}}.png 2>> {log}
-# fi
-
-# done
-# done
-# done
-
-# touch {output.outfile}
-#         """
+rule gvizredux:
+    input:
+        sortedSTARbams = expand("outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples),
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv"
+    params:
+        peptable = "conf/peptable.csv",
+        refseq = config["refseq2"],
+        genes = config["genes"],
+        ideogram = config["ideogram"],
+        intactl1s = config["intactl1s"],
+        repeats = config["repeats2"],
+        levels = config["levels"],
+        condition_colors = config["condition_colors"],
+        telocalmapping = "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd.locations"
+    output:
+        outfile = "results/outfile.gviz.txt"
+    conda:
+        "envs/repeatanalysis.yml"
+    script:
+        "scripts/gviz.R"
 
 rule repeatanalysis:
     input:
