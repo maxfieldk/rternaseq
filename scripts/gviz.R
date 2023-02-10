@@ -143,7 +143,7 @@ for (rte in dertelist) {
         start = start, end = stop,
         chromosome = chr,
         inBackground = TRUE,
-        fill = "#fdf7b4",
+        fill = "#d5e2ff",
         col = "transparent"
     )
 
