@@ -8,7 +8,7 @@ snakemake \
     --rerun-incomplete  \
     --latency-wait 30 \
     --jobs 20 \
-    --default-resources mem_mb=30000 disk_mb=200000 \
+    --default-resources mem_mb=30000 disk_mb=200000 runtime=300 \
     --cluster '
         sbatch \
         -e slurm/slurm-%j.err \
@@ -19,35 +19,39 @@ snakemake \
         --time 5:00:00' \
     --dry-run
 '''
-#did the comment show up?
-
-
 import os
+import pandas as pd
 from pathlib import Path
 configfile: "config.yaml"
 pepfile: "conf/project_config.yaml"
 
-# from snakemake.shell import shell
-# shell.executable('/bin/zsh')
-
 container: "docker://maxfieldkelsey/snakesenescence:latest"
 
-#samples = ['SRR6515351', 'SRR6515354']
 samples = pep.sample_table.sample_name
 peptable = pep.sample_table
 import csv
 peptable.to_csv("conf/peptable.csv", index = False, quoting=csv.QUOTE_NONNUMERIC)
 
-rule all:
-    input:
-        expand("allplotsDONE{sample}.txt", sample = samples)        
-        
-
-
 # tips:
 # build needed directories in python! Will save you much frustration :)
 # watch out for multiline shell commands - they fail for weird reasons sometimes.
+try:
+    dertes = pd.read_table("results/agg/repeatanalysis/allactiveDETEs.tsv", header = None)
+except:
+    None
+try:
+    gvizout = expand("temp/outfile{telocaltype}{contrast}{rtekind}{range}._{telocaltype}._{contrast}._{rtekind}._{range}.gviz.txt", 
+        telocaltype = config["telocaltypes"],
+        contrast = config["contrasts"],
+        rtekind = list(dertes.iloc[:,0].unique()),
+        range = [500, 1000, 6000, 30000])
+except:
+    gvizout = ""
 
+rule all:
+    input:
+        gvizout
+        
 ########################################################### Make folders
 if True:
     path = 'slurm'
@@ -754,11 +758,13 @@ rule pyGenomeTracks:
         "scripts/pygenometracks.sh"
 
 
-rule gvizredux:
+rule gvizreduxParallel:
     input:
         sortedSTARbams = expand("outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples),
         DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv"
     params:
+        contrasts = config["contrasts"],
+        telocaltypes = config["telocaltypes"],
         peptable = "conf/peptable.csv",
         refseq = config["refseq2"],
         genes = config["genes"],
@@ -767,13 +773,21 @@ rule gvizredux:
         repeats = config["repeats2"],
         levels = config["levels"],
         condition_colors = config["condition_colors"],
-        telocalmapping = "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd.locations"
+        telocalmapping = "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd.locations",
+        outputdir = "results/agg/genometracks"
+    resources:
+        mem_mb  = 20000,
+        runtime = 30
     output:
-        outfile = "results/outfile.gviz.txt"
+        outfile = "temp/outfile{telocaltype}{contrast}{rtekind}{range}._{telocaltype}._{contrast}._{rtekind}._{range}.gviz.txt"
     conda:
         "envs/repeatanalysis.yml"
     script:
         "scripts/gviz.R"
+
+
+
+
 
 rule repeatanalysis:
     input:
@@ -788,6 +802,7 @@ rule repeatanalysis:
         contrast_colors =config["contrast_colors"],
         condition_colors =config["condition_colors"],
         repeats = config["repeats"],
+        repeatsannotatted = config["repeatsannotated"],
         telocalmapping = config["telocalmapping"],
         inputdir = "results/agg/deseq2",
         outputdir = "results/agg/repeatanalysis"
@@ -1067,3 +1082,9 @@ rule INTEGRATErepeatanalysis:
         outfile = "results/agg/repeatanalysis/INTEGRATEoutfile.txt"
     script:
         "scripts/repeatanalysis.R"
+
+
+
+#############################################
+
+

@@ -191,7 +191,7 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         colnames(ddsrlogcounts)[1] <- "Geneid"
 
 
-        
+
 
         avoidzero <- 1
         meancols <- c()
@@ -580,26 +580,27 @@ for (direction in c("UP", "DOWN")) {
 
 
 ####### Write the DE results to table
-mapper <- read.delim(snakemake@params[["telocalmapping"]], sep = "\t")
-tab <- table(mapper$TE)
+mapper <- read.delim(snakemake@params[["telocalmapping"]], sep = "\t", header = FALSE)
 #### functions
 getPos <- function(rte, tab) {
-    if (unname(tab[rte]) > 1) {
-        return(NULL)
-    } else {
-        rterow <- mapper %>% filter(TE == rte)
-        val <- rterow["chromosome.start.stop.strand"]
-        chr <- str_split(val, ":")[[1]][1]
-        coords <- str_split(val, ":")[[1]][2]
-        strand <- str_split(val, ":")[[1]][3]
-        start <- str_split(coords, "-")[[1]][1]
-        stop <- str_split(coords, "-")[[1]][2]
-
-        return(list(chr = chr, start = as.numeric(start), stop = as.numeric(stop), strand = strand))
-    }
+    rterow <- mapper %>%
+        filter(V4 == rte) %>%
+        group_by(V4) %>%
+        summarize(
+            chr = dplyr::first(V1),
+            start = min(V2),
+            stop = max(V3),
+            name = dplyr::first(V4),
+            bs = dplyr::first(V5),
+            strand = dplyr::first(V6),
+            intron = max(V7),
+            exon = max(V8)
+        )
+    return(list(chr = rterow$chr, start = as.numeric(rterow$start), stop = as.numeric(rterow$stop), strand = rterow$strand, intron = as.numeric(rterow$intron), exon = as.numeric(rterow$exon)))
 }
 
-dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), stringsAsFactors = FALSE)
+
+dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), intron = character(), exon = character(), region = character(), stringsAsFactors = FALSE)
 i <- 1
 rtenames <- c("L1HS", "AluY", "HERVK-int", "L1PA2", "L1PA3", "L1PA4")
 for (direction in c("UP", "DOWN")) {
@@ -619,7 +620,10 @@ for (direction in c("UP", "DOWN")) {
                     stop <- location["stop"][[1]]
                     strand <- location["strand"][[1]]
                     length <- stop - start
-                    vec <- c(name, rte, chr, start, stop, strand, direction, contrast, telocaltype, length)
+                    intron <- location["intron"][[1]]
+                    exon <- location["exon"][[1]]
+                    region <- ifelse(intron > 0, "intron", ifelse(exon > 0, "exon", "other"))
+                    vec <- c(name, rte, chr, start, stop, strand, direction, contrast, telocaltype, length, intron, exon, region)
                     dedf[i, ] <- vec
                     i <- i + 1
                 }
@@ -629,6 +633,45 @@ for (direction in c("UP", "DOWN")) {
 }
 
 write.table(dedf, file = snakemake@output[["DETEsbyContrast"]], quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
+
+
+
+
+
+head(dedf)
+outputdir <- paste(snakemake@params[["outputdir"]], sep = "/")
+
+for (counttype in telocaltypes) {
+    for (contrast in contrasts) {
+        df <- dedf[dedf$counttype == counttype & dedf$contrast == contrast, ]
+        pl <- df %>% ggplot() +
+            geom_bar(aes(x = region, fill = region)) +
+            ggtitle(paste(tetype, direction)) +
+            theme(aspect.ratio = 1) +
+            theme_cowplot()
+        dirname <- file.path(outputdir, counttype, contrast)
+        basename <- "derteByLocation.pdf"
+        pdf(file.path(dirname, basename), width = 4, height = 3)
+        print(pl)
+        dev.off()
+        for (tetype in df$tetype %>% unique()) {
+            for (direction in df$direction %>% unique()) {
+                df2 <- df[df$tetype == tetype & df$direction == direction, ]
+                pl <- df2 %>% ggplot() +
+                    geom_bar(aes(x = region, fill = region)) +
+                    ggtitle(paste(tetype, direction)) +
+                    theme(aspect.ratio = 1) +
+                    theme_cowplot()
+                dirname <- file.path(outputdir, counttype, contrast)
+                basename <- paste0("derteByLocation", tetype, direction, ".pdf")
+                pdf(file.path(dirname, basename), width = 4, height = 3)
+                print(pl)
+                dev.off()
+            }
+        }
+    }
+}
+
 
 
 ########### Are de RTEs the same?
@@ -669,6 +712,7 @@ for (direction in c("UP", "DOWN")) {
     }
     des_by_rte_master[[direction]] <- des_by_rte
 }
+
 ############ Calculating significance of overalps
 
 ## For stats purposes
@@ -697,7 +741,7 @@ for (direction in c("UP", "DOWN")) {
                 contrast_lengths <- c(contrast_lengths, length(thing))
             }
             overlap <- length(shared_des_master[[direction]][[telocaltype]][[e]])
-            if (length(contrasts) == 2 ) {
+            if (length(contrasts) == 2) {
                 significance <- phyper(overlap - 1, contrast_lengths[2], ntotal - contrast_lengths[2], contrast_lengths[1], lower.tail = FALSE)
             } else {
                 significance <- 75
@@ -783,14 +827,6 @@ for (direction in c("UP", "DOWN")) {
     }
 }
 
-# ############################### GVIZ
-# outputdir = paste(snakemake@params[["outputdir"]], "genometracks", sep = "/")
-
-# bams = snakemake@input[["sortedbamSTAR"]]
-# refseq = snakemake@params[["refseq"]]
-# l1hs6kbintactbed = snakemake@params[["l1hs6kbintactbed"]]
-# repeatsbed = snakemake@params[["repeatsbed"]]
-# hs1sorted = snakemake@params[["hs1sorted"]]
 
 ################# write table for DEs shared amongst all constrasts
 
@@ -820,147 +856,6 @@ for (direction in c("UP", "DOWN")) {
     }
 }
 write.table(dedf, file = snakemake@output[["sharedamongallcontrasts_derte"]], quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
-
-
-# #####
-# tab = table(mapper$TE)
-# gtrack = GenomeAxisTrack()
-# strack = SequenceTrack(hs1sorted)
-# repeattrack = AnnotationTrack(repeatsbed, name = "repeat masker")
-
-
-
-
-# levels = snakemake@params["samples"]
-
-# alignmenttracklist = list()
-# datatracklist = list()
-# for (i in seq(length(bams))) {
-#     assign(paste0("alTrack", i), AlignmentsTrack(bams[i],name = basename(bams[i]), isPaired = TRUE))
-#     track = get(paste0("alTrack", i))
-#     alignmenttracklist[basename(bams[i])] = track
-
-#     assign(paste0("dataTrack", i),  DataTrack(range = bams[i], genome = "hs1", type = "l", name = basename(bams[i]),  groups = factor(levels[i], levels = levels), legend = TRUE))
-#     track = get(paste0("dataTrack", i))
-#     datatracklist[basename(bams[i])] = track
-
-# }
-# for (name in names(des_by_rte)) {
-#     dertelist = des_by_rte[name]
-#     for (rte in unlist(dertelist)) {
-#         rte = str_split(rte, ":")[[1]][1]
-#         print(rte)
-#         location = getPos(rte, tab)
-#         chr = location["chr"][[1]]
-#         start = location["start"][[1]]
-#         stop = location["stop"][[1]]
-#         strand = location["strand"][[1]]
-
-#         localrtetrack <- AnnotationTrack(start = start, width = stop - start, chromosome = chr, strand = strand, id = rte)
-#         dir = paste(outputdir, "consitentlyDE", sep = '/')
-#         if (!dir.exists(dir)){
-#             dir.create(dir)}
-#         pdf(paste(outputdir, "consitentlyDE", paste0(name, "_", rte, ".pdf"), sep = '/'), width=9, height=50)
-#         plotTracks(c(strack, gtrack, localrtetrack, alignmenttracklist),
-#         chromosome = chr,
-#         from = start,
-#         to = stop,
-#         extend.left = 0.1, extend.right = 0.1,  ylim = c(0, 50),
-#         featureAnnotation = "id")
-#         dev.off()
-
-# dt1 = DataTrack(range = "/users/mkelsey/data/marco/outs/SRR6515349/SRR6515349_cov.bw",
-#         chromosome = chr,
-#         from = start,
-#         to = stop, type = "histogram", name = basename(bams[1]), legend = TRUE)
-
-# dt2 = AlignmentsTrack(range = bams[2],
-#         chromosome = chr,
-#         from = start,
-#         to = stop,genome = "hs1", type = "coverage", name = basename(bams[2]), legend = TRUE)
-
-
-
-#  ylims <- extendrange(range(c(values(dt1), values(dt2))))
-#  range(c(values(dTrack3), values(dTrack2))))
-
-
-#         pdf("cooltime.pdf", width=9, height=4)
-#         plotTracks(c(strack, gtrack, dt1, dt2),
-#         chromosome = chr,
-#         from = start,
-#         to = stop,
-#         extend.left = 0.1, extend.right = 0.1)
-#         dev.off()
-
-#         reps = 3
-#         if ((length(datatracklist) %% reps) == 0) {
-#             timestocycle = length(datatracklist) / reps
-
-#             tracks_grouped = list(strack, localrtetrack)
-#             for (i in seq(timestocycle)) {
-#                 i = i-1
-#                 tracks = datatracklist[((reps*i)+1):((reps*i)+3)]
-#                 ot <- OverlayTrack(trackList=tracks)
-#                 tracks_grouped = c(tracks_grouped, ot)
-#             }
-
-#             pdf(paste(outputdir, "consitentlyDE", paste0(name, "_", rte, "Grouped", ".pdf"), sep = '/'), width=9, height=6)
-#             plotTracks(tracks_grouped,
-#                 chromosome = chr,
-#                 from = start,
-#                 to = stop,
-#                 extend.left = 0.1, extend.right = 0.1,  ylim = c(0, 1000),
-#                 featureAnnotation = "id")
-#             dev.off()
-#         }
-
-#     }
-
-# }
-
-
-# getOption("Gviz.scheme")
-# ## [1] "default"
-# scheme <- getScheme()
-# scheme$background.title = "darkblue"
-# scheme$background.panel = "#FFFEDB"
-# addScheme(scheme, "myScheme")
-# options(Gviz.scheme = "myScheme")
-
-
-
-# tracks_grouped = list(strack, localrtetrack)
-# for (i in seq(timestocycle)) {
-#     i = i-1
-#     tracks = datatracklist[((reps*i)+1):((reps*i)+3)]
-#     ot <- OverlayTrack(trackList=tracks)
-#     tracks_grouped = c(tracks_grouped, ot)
-# }
-
-# datatracklist
-
-
-# pdf(paste("play.pdf", sep = '/'), width=9, height=6)
-# plotTracks(tracks_grouped[4],
-#     chromosome = chr,
-#     from = start,
-#     to = stop,
-#     extend.left = 0.1, extend.right = 0.1,  ylim = c(0, 1000),
-#     featureAnnotation = "id")
-# dev.off()
-
-
-# pdf(paste("play.pdf", sep = '/'), width=9, height=6)
-# plotTracks(ot,
-#     chromosome = chr,
-#     from = start,
-#     to = stop,
-#     type = c("smooth", "p"),
-#     each = 3,
-#     extend.left = 0.1, extend.right = 0.1,  ylim = c(0, 1000),
-#     featureAnnotation = "id")
-# dev.off()
 
 #################### RTE in genome histograms
 outputdir <- snakemake@params[["outputdir"]]

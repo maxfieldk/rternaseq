@@ -1,7 +1,3 @@
-log <- file(snakemake@log[[1]], open = "wt")
-sink(log)
-save.image()
-
 library("readr")
 library("stringr")
 library("dplyr")
@@ -17,22 +13,25 @@ library("GenomicRanges")
 library("rtracklayer")
 library("trackViewer")
 library("org.Hs.eg.db")
-library("httpgd")
 ####################################
 bams <- snakemake@input[["sortedSTARbams"]]
-refseq <- snakemake@params[["refseq2"]]
+refseq <- snakemake@params[["refseq"]]
 genes <- snakemake@params[["genes"]]
 l1hs6kbintactbed <- snakemake@params[["l1hs6kbintactbed"]]
-repeats <- snakemake@params[["repeats2"]]
+repeats <- snakemake@params[["repeats"]]
 mapper <- read.delim(snakemake@params[["telocalmapping"]], sep = "\t")
 peptable <- read.csv(snakemake@params[["peptable"]])
 samples <- peptable$sample_name
 ideodf <- snakemake@params[["ideogram"]]
 ideodf <- "/users/mkelsey/data/ref/genomes/hs1/annotations2/ideogramWithStain.bed"
-levels <- c("PRO", "SEN")
 levels <- snakemake@params[["levels"]]
-condition_colors <- list("PRO" = "blue", "SEN" = "red")
 condition_colors <- snakemake@params[["condition_colors"]]
+dertes <- read.delim(snakemake@input[["DETEsbyContrast"]], header = FALSE)
+outputdir <- snakemake@params[["outputdir"]]
+contrast <- snakemake@wildcards[["contrast"]]
+rtekind <- snakemake@wildcards[["rtekind"]]
+telocaltype <- snakemake@wildcards[["telocaltype"]]
+myrange <- as.integer(snakemake@wildcards[["range"]])
 #######################################
 # getOption("Gviz.scheme")
 # ## [1] "default"
@@ -69,51 +68,15 @@ ideodf <- read.delim(ideodf, header = TRUE)
 strack <- SequenceTrack("/users/mkelsey/data/ref/genomes/hs1/hs1.sorted.fa")
 # localrtetrack <- AnnotationTrack(start = start, width = stop - start, chromosome = chr, strand = strand, id = rte, genome = genome)
 ideogramtrack <- IdeogramTrack(genome = genome, bands = ideodf)
-
-# fix! levels <- samples
-
-
-bamsubset <- bams[(grepl("PRO", bams) | grepl("NT", bams))]
-
-svec <- bamsubset
-alignmentTrackList <- list()
-for (i in seq(length(svec))) {
-    sample <- str_split_1(basename(svec[i]), "\\.")[1]
-    condition <- peptable[peptable$sample_name == sample, ]$condition
-    fillcolor <- condition_colors[[condition]]
-    assign(
-        paste0("alTrack", i),
-        AlignmentsTrack(svec[i],
-            name = sample,
-            isPaired = TRUE,
-            genome = "hs1",
-            ylim = c(0, 25),
-            type = "coverage",
-            fill = fillcolor
-        )
-    )
-    track <- get(paste0("alTrack", i))
-    alignmentTrackList[sample] <- track
-}
-
-# genesdf = read.delim(genes, header = FALSE, sep = "")
-# names(genesdf)[1] = "chromosome"
-# names(genesdf)[3] = "feature"
-# names(genesdf)[4] = "start"
-# names(genesdf)[5] = "end"
-# names(genesdf)[7] = "strand"
-# names(genesdf)[16] = "gene"
-
 genesTrack <- GeneRegionTrack(genes,
     genome = genome,
     showFeatureId = TRUE,
     showID = TRUE,
-    name = "RefSeqCurated",
+    name = "RefSeq",
     stacking = "squish",
     collapseTranscripts = TRUE,
     shape = "arrow"
 )
-
 repeatTrack <- GeneRegionTrack(repeats,
     name = "RepeatMasker",
     genome = genome,
@@ -124,19 +87,50 @@ repeatTrack <- GeneRegionTrack(repeats,
     fill = "#95c8ff"
 )
 
-dertelist <- c("L1HS_dup291")
+# generate alignemnt tracks for the relevant samples for this contrast
+conditions <- gsub("condition_", "", contrast) %>% str_split_1("_vs_")
+samples <- peptable[peptable$condition %in% conditions, ]$sample_name
+bamsubset <- c()
+for (sample in samples) {
+    samplebam <- bams[(grepl(sample, bams))]
+    bamsubset <- c(bamsubset, samplebam)
+}
+alignmentTrackList <- list()
+for (i in seq(length(bamsubset))) {
+    sample <- str_split_1(basename(bamsubset[i]), "\\.")[1]
+    condition <- peptable[peptable$sample_name == sample, ]$condition
+    fillcolor <- condition_colors[[condition]]
+    assign(
+        paste0("alTrack", i),
+        AlignmentsTrack(bamsubset[i],
+            name = sample,
+            isPaired = TRUE,
+            genome = "hs1",
+            type = "coverage",
+            fill = fillcolor
+        )
+    )
+    track <- get(paste0("alTrack", i))
+    alignmentTrackList[sample] <- track
+}
+
+######
+dertelist <- dertes[dertes$V9 == telocaltype & dertes$V8 == contrast & dertes$V1 == rtekind, ]$V2
 for (rte in dertelist) {
+    dirname <- file.path(outputdir, telocaltype, contrast, rtekind, rte)
+    dir.create(dirname, recursive = TRUE)
+    rterow <- dertes[dertes$V1 == rte]
+    direction <- rterow$V6
     location <- getPos(rte, tab)
     genome <- "hs1"
     chr <- location["chr"][[1]]
     strand <- location["strand"][[1]]
     start <- location["start"][[1]]
     stop <- location["stop"][[1]]
-
     length <- stop - start
     gtrack <- GenomeAxisTrack(name = paste0(length, "bp"))
 
-    tracks <- c(gtrack, alignmentTrackList, genesTrack, repeatTrack)
+    tracks <- c(gtrack, alignmentTrackList, repeatTrack, genesTrack)
     lengthtracks <- length(tracks)
     ht <- HighlightTrack(
         trackList = tracks,
@@ -147,37 +141,47 @@ for (rte in dertelist) {
         col = "transparent"
     )
 
-    pdf("z.pdf", width = 6, height = 8)
-    pl <- plotTracks(
-        c(ideogramtrack, ht),
-        chromosome = chr,
-        from = start,
-        to = stop,
-        extend.right = 5000,
-        extend.left = 5000,
-        sizes = c(0.2, rep(0.3, lengthtracks)),
-        showFeatureId = TRUE,
-        featureAnnotation = "id",
-        shape = "fixedArrow",
-        collapseTranscripts = TRUE,
-        showId = TRUE,
-        col = "black",
-        fontcolor = "black",
-        fontcolor.group = "black",
-        background.panel = NULL,
-        background.title = "#dadada",
-        col.title = "black",
-        col.border.title = "black",
-        col.axis = "black",
-        col = "black",
-        showSampleNames = TRUE
-    )
-    dev.off()
+    ylims <- list(c(0, 10), c(0, 27), c(0, 53), c(0, 105), c(0, 305), c(0, 505))
+    for (ylim in ylims) {
+        ylim <- unlist(ylim)
+        basename <- paste0(
+            direction, rte, "_", chr, "_",
+            start, "_", stop, "_", "range", myrange,
+            "ylim", ylim[2], ".pdf"
+        )
+        try(
+        pdf(file.path(dirname, basename), width = 7, height = 10)
+        pl <- plotTracks(
+            c(ideogramtrack, ht),
+            chromosome = chr,
+            from = start,
+            to = stop,
+            ylim = ylim,
+            extend.right = myrange,
+            extend.left = myrange,
+            sizes = c(0.2, rep(0.3, lengthtracks)),
+            showFeatureId = TRUE,
+            featureAnnotation = "id",
+            shape = "fixedArrow",
+            collapseTranscripts = TRUE,
+            showId = TRUE,
+            col = "black",
+            fontcolor = "black",
+            fontcolor.group = "black",
+            background.panel = NULL,
+            background.title = "#dadada",
+            col.title = "black",
+            col.border.title = "black",
+            col.axis = "black",
+            col = "black",
+            showSampleNames = TRUE
+        )
+        dev.off(), silent = TRUE
+        )
+    }
 }
 
 #####################
 
 x <- data.frame()
 write.table(x, file = snakemake@output[["outfile"]], col.names = FALSE)
-
-dev.off()
