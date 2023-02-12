@@ -27,13 +27,15 @@ contrast_colors <- snakemake@params[["contrast_colors"]]
 contrast_colors <- unname(unlist(contrast_colors))
 condition_colors <- snakemake@params[["condition_colors"]]
 condition_colors <- unname(unlist(condition_colors))
+repeatsannotated = read_table(snakemake@params[["repeatsannotatted"]], col_names = FALSE) 
+telocalrepeatsannotated = read_table(snakemake@params[["telocalmapping"]], col_names = FALSE)
 ######## MAIN FUNCTIONS
 #### GENERAL UTILITY
 my_comma <- function(num) {
     format(round(as.numeric(num), 1), nsmall = 0, big.mark = ",")
 }
 #### PLOTTING
-plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", colors = c("red", "blue", "grey"), alpha = 0.9, number_to_sample = NULL, annotate_top = 0) {
+plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", colors = c("red", "orange", "grey"), alpha = 0.9, number_to_sample = NULL, annotate_top = 0) {
     dat <- df %>% filter(.data[[classificationlevel]] == rte)
     if (is.null(number_to_sample)) {
         arranged <- dat %>% arrange(padj)
@@ -41,13 +43,13 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
         arranged$rank <- as.integer(arranged$rank)
         arranged <- arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
         rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
-            geom_point(aes(color = Significance)) +
+            geom_point(aes(color = Significance, shape = region2)) +
             geom_abline(intercept = 0) +
             coord_fixed() +
             xlim(lims) +
             ylim(lims) +
             scale_color_manual(values = colors) +
-            theme_cowplot() +
+            scale_shape_manual(name = "Genomic\nContext", values = c("Genic" = 19, "Non-Genic" = 17)) +            theme_cowplot() +
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
             theme(axis.line = element_blank()) +
@@ -72,12 +74,13 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
         arranged$rank <- as.integer(arranged$rank)
         arranged <- arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
         rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
-            geom_point(aes(color = Significance)) +
+            geom_point(aes(color = Significance, shape = region2)) +
             geom_abline(intercept = 0) +
             coord_fixed() +
             xlim(lims) +
             ylim(lims) +
             scale_color_manual(values = colors) +
+            scale_shape_manual(name = "Genomic\nContext", values = c("Genic" = 19, "Non-Genic" = 17)) +
             theme_cowplot() +
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
@@ -98,7 +101,7 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
     }
 }
 
-plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, valuescol = "log2FoldChange") {
+plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, groupByRegion = FALSE, valuescol = "log2FoldChange") {
     if (is.null(repeattypesallowed)) {
         df <- df %>%
             filter(.data[[classificationlevel]] != "Other")
@@ -106,7 +109,21 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, value
         df <- df %>%
             filter(.data[["Family"]] %in% repeattypesallowed)
     }
+    if (groupByRegion) {
+    agg <- df %>%
+        ggplot(aes(fill = region2, x = .data[[classificationlevel]], y = .data[[valuescol]])) +
+        geom_violin(draw_quantiles = c(0.5)) +
+        geom_hline(aes(yintercept = 0), color = "red") +
+        scale_fill_manual(name = "Genomic\nContext", values = c("Genic" = "blue", "Non-Genic" = "green")) +
+        ggtitle("RTEs") +
+        coord_fixed() +
+        ylim(c(-11, 11)) +
+        theme_cowplot() +
+        panel_border(color = "black", linetype = 1, remove = FALSE) +
+        theme(axis.line = element_blank()) +
+        theme(aspect.ratio = 1)
 
+    } else {
     agg <- df %>%
         ggplot(aes(x = .data[[classificationlevel]], y = .data[[valuescol]])) +
         geom_violin(draw_quantiles = c(0.5)) +
@@ -119,7 +136,7 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, value
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line = element_blank()) +
         theme(aspect.ratio = 1)
-
+    }
     numberxaxis <- df[, classificationlevel] %>%
         unique() %>%
         length()
@@ -173,7 +190,7 @@ contrasts <- snakemake@params[["contrasts"]]
 levelslegendmap <- snakemake@params[["levelslegendmap"]]
 telocaltypes <- snakemake@params[["telocaltypes"]]
 
-for (counttype in snakemake@params[["telocaltypes"]]) {
+for (counttype in telocaltypes) {
     for (contrast in contrasts) {
         ####### DATA WRANGLING
         contrast_level_2 <- unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
@@ -231,6 +248,19 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         results <- Reduce(function(x, y) merge(x, y, by = "Geneid"), dflist, accumulate = FALSE)
         results <- results %>% mutate(Significance = ifelse(padj < 0.05, ifelse(padj < 0.001, "< 0.001", "< 0.05"), "> 0.05"))
         results <- results %>% mutate(teorgenename = str_split(Geneid, ":", simplify = TRUE)[, 1])
+        colnames(telocalrepeatsannotated) <- c("chr", "start", "stop", "teorgenename", "ignore", "strand", "intronOverlapCount", "exonOverlapCount", "region")
+        results = left_join(
+        results,
+        telocalrepeatsannotated,
+        by = "teorgenename",
+        copy = FALSE,
+        suffix = c(".x", ".y"),
+        keep = NULL,
+        na_matches = c("na", "never"),
+        multiple = "any",
+        unmatched = "drop"
+        )
+        results <- results %>% mutate(region2 = ifelse(region == "exon" | region == "intron", "Genic", "Non-Genic"))
         genes <- results$Geneid
 
 
@@ -335,7 +365,7 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         violinplots <- list()
         classificationlevels <- c("TE", "Family", "ActiveTE")
         for (classificationlevel in classificationlevels) {
-            tempplot <- plotAggRTE(results, classificationlevel)
+            tempplot <- plotAggRTE(results, classificationlevel, groupByRegion = TRUE)
             pdf(paste(outputdir, contrast, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
             dev.off()
@@ -345,11 +375,23 @@ for (counttype in snakemake@params[["telocaltypes"]]) {
         L1violinplots <- list()
         classificationlevels <- c("TE")
         for (classificationlevel in classificationlevels) {
-            tempplot <- plotAggRTE(results, classificationlevel, repeattypesallowed = c("L1"))
+            tempplot <- plotAggRTE(results, classificationlevel, repeattypesallowed = c("L1"), groupByRegion = TRUE)
             pdf(paste(outputdir, contrast, paste0("AggL1", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
             dev.off()
             L1violinplots[[classificationlevel]] <- tempplot
+        }
+
+        ####### region plots
+
+        regionplots <- list()
+        classificationlevels <- c("TE", "Family", "ActiveTE")
+        for (classificationlevel in classificationlevels) {
+            tempplot <- plotAggRTE(results, classificationlevel)
+            pdf(paste(outputdir, contrast, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
+            print(tempplot)
+            dev.off()
+            violinplots[[classificationlevel]] <- tempplot
         }
 
 
@@ -634,10 +676,6 @@ for (direction in c("UP", "DOWN")) {
 
 write.table(dedf, file = snakemake@output[["DETEsbyContrast"]], quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
 
-
-
-
-
 head(dedf)
 outputdir <- paste(snakemake@params[["outputdir"]], sep = "/")
 
@@ -646,7 +684,7 @@ for (counttype in telocaltypes) {
         df <- dedf[dedf$counttype == counttype & dedf$contrast == contrast, ]
         pl <- df %>% ggplot() +
             geom_bar(aes(x = region, fill = region)) +
-            ggtitle(paste(tetype, direction)) +
+            ggtitle("DE RTE") +
             theme(aspect.ratio = 1) +
             theme_cowplot()
         dirname <- file.path(outputdir, counttype, contrast)
@@ -659,7 +697,7 @@ for (counttype in telocaltypes) {
                 df2 <- df[df$tetype == tetype & df$direction == direction, ]
                 pl <- df2 %>% ggplot() +
                     geom_bar(aes(x = region, fill = region)) +
-                    ggtitle(paste(tetype, direction)) +
+                    ggtitle(paste("DE" tetype, direction)) +
                     theme(aspect.ratio = 1) +
                     theme_cowplot()
                 dirname <- file.path(outputdir, counttype, contrast)
