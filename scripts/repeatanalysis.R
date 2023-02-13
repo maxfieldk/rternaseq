@@ -101,7 +101,7 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
     }
 }
 
-plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, groupByRegion = FALSE, valuescol = "log2FoldChange") {
+plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, groupByRegion = TRUE, valuescol = "log2FoldChange") {
     if (is.null(repeattypesallowed)) {
         df <- df %>%
             filter(.data[[classificationlevel]] != "Other")
@@ -114,11 +114,12 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, group
         ggplot(aes(fill = region2, x = .data[[classificationlevel]], y = .data[[valuescol]])) +
         geom_violin(draw_quantiles = c(0.5)) +
         geom_hline(aes(yintercept = 0), color = "red") +
-        scale_fill_manual(name = "Genomic\nContext", values = c("Genic" = "blue", "Non-Genic" = "green")) +
+        scale_fill_manual(name = "", values = c("Genic" = "blue", "Non-Genic" = "green")) +
         ggtitle("RTEs") +
         coord_fixed() +
         ylim(c(-11, 11)) +
         theme_cowplot() +
+        theme(legend.position = c(0.05, 0.18)) +
         panel_border(color = "black", linetype = 1, remove = FALSE) +
         theme(axis.line = element_blank()) +
         theme(aspect.ratio = 1)
@@ -319,7 +320,9 @@ for (counttype in telocaltypes) {
                 print(e)
                 if (e != "Other") {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 0)
-                    pdf(paste(outputdir, contrast, paste0(e, "NotAnnotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    dirname <- file.path(outputdir, contrast, e)	
+                    dir.create(dirname, recursive = TRUE)                           
+                    pdf(paste(dirname, paste0(e, "NotAnnotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
                     scatterplotsNoAnnotations[[e]] <- tempplot
@@ -334,9 +337,11 @@ for (counttype in telocaltypes) {
             types2plot <- results[, classificationlevel] %>% unique()
             for (e in types2plot) {
                 print(e)
-                if (e != "Other") {
+                if (e != "Other") {                    
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 5)
-                    pdf(paste(outputdir, contrast, paste0(e, "highlyannotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    dirname <- file.path(outputdir, contrast, e)	
+                    dir.create(dirname, recursive = TRUE)                           
+                    pdf(paste(dirname, paste0(e, "highlyannotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
                     scatterplotsHighlyAnnotated[[e]] <- tempplot
@@ -353,7 +358,9 @@ for (counttype in telocaltypes) {
                 print(e)
                 if (e != "Other") {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = 1000, annotate_top = 3)
-                    pdf(paste(outputdir, contrast, paste0(e, "annotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    dirname <- file.path(outputdir, contrast, e)	
+                    dir.create(dirname, recursive = TRUE)                    
+                    pdf(paste(dirname, paste0(e, "annotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
                     scatterplots[[e]] <- tempplot
@@ -366,7 +373,9 @@ for (counttype in telocaltypes) {
         classificationlevels <- c("TE", "Family", "ActiveTE")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel, groupByRegion = TRUE)
-            pdf(paste(outputdir, contrast, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
+            dirname <- file.path(outputdir, contrast)	
+            dir.create(dirname, recursive = TRUE)            
+            pdf(paste(dirname, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
             dev.off()
             violinplots[[classificationlevel]] <- tempplot
@@ -376,7 +385,9 @@ for (counttype in telocaltypes) {
         classificationlevels <- c("TE")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel, repeattypesallowed = c("L1"), groupByRegion = TRUE)
-            pdf(paste(outputdir, contrast, paste0("AggL1", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
+            dirname <- file.path(outputdir, contrast)	
+            dir.create(dirname, recursive = TRUE)            
+            pdf(paste(dirname, paste0("AggL1", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
             dev.off()
             L1violinplots[[classificationlevel]] <- tempplot
@@ -388,7 +399,9 @@ for (counttype in telocaltypes) {
         classificationlevels <- c("TE", "Family", "ActiveTE")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel)
-            pdf(paste(outputdir, contrast, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
+            dirname <- file.path(outputdir, contrast)	
+            dir.create(dirname, recursive = TRUE)            
+            pdf(paste(dirname, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
             dev.off()
             violinplots[[classificationlevel]] <- tempplot
@@ -399,7 +412,7 @@ for (counttype in telocaltypes) {
         ###### First with annotations
         # Active RTE
         legend <- get_legend(scatterplots[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["ActiveTE"]] + theme(legend.position = "none"),
+        p <- plot_grid(violinplots[["ActiveTE"]],
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
             scatterplots[["AluY"]] + theme(legend.position = "none"),
             scatterplots[["HERVK-int"]] + theme(legend.position = "none"),
@@ -409,13 +422,15 @@ for (counttype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("activeelementContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
+        dirname <- file.path(outputdir, contrast)	
+        dir.create(dirname, recursive = TRUE)        
+        pdf(paste(dirname, paste0("activeelementContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
         # Family
         legend <- get_legend(scatterplots[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["Family"]] + theme(legend.position = "none"),
+        p <- plot_grid(violinplots[["Family"]],
             scatterplots[["L1"]] + theme(legend.position = "none"),
             scatterplots[["Alu"]] + theme(legend.position = "none"),
             scatterplots[["ERVK"]] + theme(legend.position = "none"),
@@ -425,18 +440,20 @@ for (counttype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("FamilyContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
+        dirname <- file.path(outputdir, contrast)	
+        dir.create(dirname, recursive = TRUE)
+        pdf(paste(dirname, paste0("FamilyContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
 
         ########## Plot activete and family together
         legend <- get_legend(scatterplots[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["Family"]] + theme(legend.position = "none"),
+        p <- plot_grid(violinplots[["Family"]],
             scatterplots[["L1"]] + theme(legend.position = "none"),
             scatterplots[["Alu"]] + theme(legend.position = "none"),
             scatterplots[["ERVK"]] + theme(legend.position = "none"),
-            violinplots[["ActiveTE"]] + theme(legend.position = "none"),
+            violinplots[["ActiveTE"]],
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
             scatterplots[["AluY"]] + theme(legend.position = "none"),
             scatterplots[["HERVK-int"]] + theme(legend.position = "none"),
@@ -446,13 +463,15 @@ for (counttype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("CombinedContrastPlot", ".pdf"), sep = "/"), width = 14, height = 8)
+        dirname <- file.path(outputdir, contrast)	
+        dir.create(dirname, recursive = TRUE)        
+        pdf(paste(dirname, paste0("CombinedContrastPlot", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
 
         ########## L1 together plot
         legend <- get_legend(scatterplots[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(L1violinplots[["TE"]] + theme(legend.position = "none"),
+        p <- plot_grid(L1violinplots[["TE"]],
             scatterplots[["L1"]] + theme(legend.position = "none"),
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
             scatterplots[["L1PA2"]] + theme(legend.position = "none"),
@@ -466,7 +485,9 @@ for (counttype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("CombinedContrastPlotL1", ".pdf"), sep = "/"), width = 14, height = 8)
+        dirname <- file.path(outputdir, contrast)	
+        dir.create(dirname, recursive = TRUE)        
+        pdf(paste(dirname, paste0("CombinedContrastPlotL1", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
 
@@ -474,7 +495,7 @@ for (counttype in telocaltypes) {
         ############## Same together plots but without the annotations
         # Active RTE
         legend <- get_legend(scatterplotsNoAnnotations[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["ActiveTE"]] + theme(legend.position = "none"),
+        p <- plot_grid(violinplots[["ActiveTE"]],
             scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["AluY"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["HERVK-int"]] + theme(legend.position = "none"),
@@ -484,13 +505,15 @@ for (counttype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("activeelementContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
+        dirname <- file.path(outputdir, contrast)	
+        dir.create(dirname, recursive = TRUE)
+        pdf(paste(dirname, paste0("activeelementContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
         # Family
         legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["Family"]] + theme(legend.position = "none"),
+        p <- plot_grid(violinplots[["Family"]],
             scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["Alu"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["ERVK"]] + theme(legend.position = "none"),
@@ -500,18 +523,20 @@ for (counttype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("FamilyContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
+        dirname <- file.path(outputdir, contrast)	
+        dir.create(dirname, recursive = TRUE)
+        pdf(paste(dirname, paste0("FamilyContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
 
         ########## Plot activete and family together
         legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["Family"]] + theme(legend.position = "none"),
+        p <- plot_grid(violinplots[["Family"]],
             scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["Alu"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["ERVK"]] + theme(legend.position = "none"),
-            violinplots[["ActiveTE"]] + theme(legend.position = "none"),
+            violinplots[["ActiveTE"]],
             scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["AluY"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["HERVK-int"]] + theme(legend.position = "none"),
@@ -521,13 +546,15 @@ for (counttype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("CombinedContrastPlotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
+        dirname <- file.path(outputdir, contrast)	
+        dir.create(dirname, recursive = TRUE)
+        pdf(paste(dirname, paste0("CombinedContrastPlotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
 
         ########## L1 together plot
         legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(L1violinplots[["TE"]] + theme(legend.position = "none"),
+        p <- plot_grid(L1violinplots[["TE"]],
             scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["L1PA2"]] + theme(legend.position = "none"),
@@ -697,10 +724,11 @@ for (counttype in telocaltypes) {
                 df2 <- df[df$tetype == tetype & df$direction == direction, ]
                 pl <- df2 %>% ggplot() +
                     geom_bar(aes(x = region, fill = region)) +
-                    ggtitle(paste("DE" tetype, direction)) +
+                    ggtitle(paste("DE", tetype, direction)) +
                     theme(aspect.ratio = 1) +
                     theme_cowplot()
-                dirname <- file.path(outputdir, counttype, contrast)
+                dirname <- file.path(outputdir, counttype, contrast, tetype)	
+                dir.create(dirname, recursive = TRUE)
                 basename <- paste0("derteByLocation", tetype, direction, ".pdf")
                 pdf(file.path(dirname, basename), width = 4, height = 3)
                 print(pl)
@@ -829,7 +857,9 @@ for (direction in c("UP", "DOWN")) {
             pl <- ggdraw(p) +
                 annotate("text", label = sigcode, x = Inf, y = Inf, vjust = 1, hjust = 1, size = size) +
                 annotate("text", label = paste0("\nU: ", my_comma(universe)), x = Inf, y = Inf, vjust = 1, hjust = 1, size = 4)
-            pdf(paste(outputdir, paste0("VennDiagram", rte, direction, ".pdf"), sep = "/"), width = 4, height = 4)
+            dirname <- file.path(outputdir, counttype, tetype)	
+            dir.create(dirname, recursive = TRUE)
+            pdf(paste(dirname, paste0("VennDiagram", rte, direction, ".pdf"), sep = "/"), width = 4, height = 4)
             print(pl)
             dev.off()
             p_no_title <- euPlot(fit, contrasts, main = rte, fill = contrast_colors, legend = FALSE)
@@ -843,7 +873,9 @@ for (direction in c("UP", "DOWN")) {
         legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
         title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
         fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 1, 0.2))
-        pdf(paste(outputdir, paste0("VennDiagram", "RTEs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
+        dirname <- file.path(outputdir, counttype)	
+        dir.create(dirname, recursive = TRUE)
+        pdf(paste(dirname, paste0("VennDiagram", "RTEs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
         print(fgrid)
         dev.off()
 
@@ -851,7 +883,9 @@ for (direction in c("UP", "DOWN")) {
         legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
         title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
         fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 1, 0.2))
-        pdf(paste(outputdir, paste0("VennDiagram", "L1PAs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
+        dirname <- file.path(outputdir)	
+        dir.create(dirname, recursive = TRUE)
+        pdf(paste(dirname, paste0("VennDiagram", "L1PAs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
         print(fgrid)
         dev.off()
 
@@ -859,7 +893,9 @@ for (direction in c("UP", "DOWN")) {
         legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
         title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
         fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 2, 0.2))
-        pdf(paste(outputdir, paste0("VennDiagram", "AllRTEs", direction, ".pdf"), sep = "/"), width = 9, height = 12)
+        dirname <- file.path(outputdir)	
+        dir.create(dirname, recursive = TRUE)
+        pdf(paste(dirname, paste0("VennDiagram", "AllRTEs", direction, ".pdf"), sep = "/"), width = 9, height = 12)
         print(fgrid)
         dev.off()
     }

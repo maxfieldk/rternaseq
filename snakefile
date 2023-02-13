@@ -22,15 +22,16 @@ snakemake \
 import os
 import pandas as pd
 from pathlib import Path
-configfile: "config.yaml"
-pepfile: "conf/project_config.yaml"
+configfile: "conf/private/configPrivate.yaml"
+configfile: "conf/shared/configShared.yaml"
+pepfile: "conf/private/project_config.yaml"
 
 container: "docker://maxfieldkelsey/snakesenescence:latest"
 
 samples = pep.sample_table.sample_name
 peptable = pep.sample_table
 import csv
-peptable.to_csv("conf/peptable.csv", index = False, quoting=csv.QUOTE_NONNUMERIC)
+peptable.to_csv("conf/private/peptable.csv", index = False, quoting=csv.QUOTE_NONNUMERIC)
 
 # tips:
 # build needed directories in python! Will save you much frustration :)
