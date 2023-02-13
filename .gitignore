@@ -10,6 +10,8 @@
 !/envs
 !/templates
 !/tools
+!/conf
+/conf/private
 !/conf/shared
 
 !snakefile

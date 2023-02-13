@@ -1,0 +1,76 @@
+sample_table: "conf/private/sample_table.csv"
+
+#tools
+trimmomaticdir: tools/Trimmomatic-0.39
+
+#genomes
+hs1sorted: "/users/mkelsey/data/ref/genomes/hs1/hs1.sorted.fa"
+#indeces
+locindTElocal: "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd"
+telocalmapping: "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd.locations.annotated"
+bowtie2hs1index: "/users/mkelsey/data/ref/genomes/hs1/hs1.sorted_bowtie2/hs1"
+starindex: "/users/mkelsey/data/ref/genomes/hs1/STARindex"
+
+#annotations
+refseq: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.110.20220412.ncbiRefSeqUCSCstyle.gtf"
+refseq2: "/users/mkelsey/data/ref/genomes/hs1/annotations2/refseq"
+genes: "/users/mkelsey/data/ref/genomes/hs1/annotations2/genes.gtf"
+ideogram: "/users/mkelsey/data/ref/genomes/hs1/annotations2/Ideogram.bed"
+ideogram2: "/users/mkelsey/data/ref/genomes/hs1/annotations2/ideogramWithStain.bed"
+repeats: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1_RepeatMasker.sorted"
+repeatsbed: "/users/mkelsey/data/ref/genomes/hs1/annotations/repeatmasker.bed"
+repeats2: "/users/mkelsey/data/ref/genomes/hs1/annotations2/repeatMasker.gtf"
+repeatsannotated: "/users/mkelsey/data/ref/genomes/hs1/annotations2/repeatMaskerAnnotated.bed"
+l1hs6kb: "/users/mkelsey/data/ref/genomes/hs1/annotations/L1HS6kb"
+aluY: "/users/mkelsey/data/ref/genomes/hs1/annotations/aluY"
+HERVK: "/users/mkelsey/data/ref/genomes/hs1/annotations/HERVK"
+intactl1s: "/users/mkelsey/data/ref/genomes/hs1/annotations2/subsets/l1hsintact.bed"
+l1hs6kbintact: "/users/mkelsey/data/ref/genomes/hs1/annotations/L1HS6kbintact"
+l1hs6kbintactbed: "/users/mkelsey/data/ref/genomes/hs1/annotations/L1HS6kbintact.bed5"
+SenMayoHuman: "/users/mkelsey/data/ref/genesets/SenMayoGeneSetHuman.txt"
+
+genelistsforplot:
+  - "/users/mkelsey/data/ref/genesets/sasp.txt"
+
+counttypes:
+  - "star"
+  - "telocal_multi"
+  - "telocal_uniq"
+telocaltypes:
+  - "telocal_multi"
+  - "telocal_uniq"
+
+  #these are for the ideogram
+namedcolorlist:
+  L1UP: "8c00ff"
+  AluUP: "ff9d00"
+  ERVKUP: "ff7be2"
+  L1HSUP: "8c00ff"
+  AluYUP: "ff9d00"
+  HERVK-intUP: "ff7be2"
+  L1DOWN: "00ff62"
+  AluDOWN: "0be7e4"
+  ERVKDOWN: "8c00ff"
+  L1HSDOWN: "00ff62"
+  AluYDOWN: "0be7e4"
+  HERVK-intDOWN: "8c00ff"
+
+namedmarkerlist:
+  L1: "circle"
+  Alu: "box"
+  ERVK: "triange"
+  L1HS: "circle"
+  AluY: "box"
+  HERVK-int: "triangle"
+
+rtestoplot:
+  - "L1HS"
+  - "AluY"
+  - "HERVK-int"
+
+genedensity:
+  L1HS: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.L1HS.density.bed4"
+  AluY: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.HERVK.density.bed4"
+  HERVK-int: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.AluY.density.bed4"
+
+karyotype: "/users/mkelsey/data/ref/genomes/hs1/karyotype.tsv"
