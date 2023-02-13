@@ -766,7 +766,7 @@ rule gvizreduxParallel:
     params:
         contrasts = config["contrasts"],
         telocaltypes = config["telocaltypes"],
-        peptable = "conf/peptable.csv",
+        peptable = "conf/private/peptable.csv",
         refseq = config["refseq2"],
         genes = config["genes"],
         ideogram = config["ideogram"],
@@ -799,7 +799,7 @@ rule repeatanalysis:
         counttypes = config["counttypes"],
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
-        peptable = "conf/peptable.csv",
+        peptable = "conf/private/peptable.csv",
         contrast_colors =config["contrast_colors"],
         condition_colors =config["condition_colors"],
         repeats = config["repeats"],
@@ -1026,7 +1026,7 @@ rule INTEGRATEDEseq2:
         telocal_multi = "outs/agg/INTEGRATE_TElocalCounts_multi.txt",
         telocal_uniq = "outs/agg/INTEGRATE_TElocalCounts_uniq.txt",
     params:
-        peptable = "conf/peptable.csv",
+        peptable = "conf/private/peptable.csv",
         contrasts = config["contrasts"],
         counttypes = config["counttypes"],
         levels = config["levels"],
@@ -1043,7 +1043,7 @@ rule INTEGRATEDEseq2:
 #be sure to order the contrasts if there are multiple by the one whose naming scheme is respected in this project
 rule INTEGRATEdetermineSharedDeTes:
     params:
-        peptable = "conf/peptable.csv",
+        peptable = "conf/private/peptable.csv",
         outputdir = "results/agg/deseq2",
         telocaltypes = config["telocaltypes"],
         contraststocompare = ["condition_SEN_vs_PRO", "condition_LSEN_vs_PRO"]
@@ -1063,7 +1063,7 @@ rule INTEGRATErepeatanalysis:
         counttypes = config["counttypes"],
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
-        peptable = "conf/peptable.csv",
+        peptable = "conf/private/peptable.csv",
         contrast_colors =config["contrast_colors"],
         condition_colors =config["condition_colors"],
         repeats = config["repeats"],
