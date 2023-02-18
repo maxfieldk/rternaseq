@@ -33,6 +33,11 @@ peptable = pep.sample_table
 import csv
 peptable.to_csv("conf/private/peptable.csv", index = False, quoting=csv.QUOTE_NONNUMERIC)
 
+telocaltypes = config["telocaltypes"]
+contrasts = config["contrasts"]
+counttypes = config["counttypes"]
+directions = ["UP", "DOWN"]
+
 # tips:
 # build needed directories in python! Will save you much frustration :)
 # watch out for multiline shell commands - they fail for weird reasons sometimes.
@@ -51,7 +56,7 @@ except:
 
 rule all:
     input:
-        gvizout
+        expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.alignment.pdf", telocaltype = telocaltypes, contrast = contrasts, RTE = "L1HS", direction = ["UP", "DOWN"])
         
 ########################################################### Make folders
 if True:
@@ -200,6 +205,10 @@ if True:
         outpath = 'outs/%s' % (e)
         if not os.path.exists(outpath):
             os.makedirs(outpath)
+
+        outpath = 'outs/%s/trimmedReads' % (e)
+        if not os.path.exists(outpath):
+            os.makedirs(outpath)
         
         outpath = 'outs/%s/TElocal' % (e)
         if not os.path.exists(outpath):
@@ -238,42 +247,63 @@ rule fastqdump:
     shell: "fastq-dump --split-files --outdir {params.outdir} {input} 2> {log}"
 
         
-rule TrimReads:
+# rule TrimReads:
+#     input:
+#         r1=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R1"],
+#         r2=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R2"]
+#         # r1 = "rawdata/{sample}_1.fastq.gz",
+#         # r2 = "rawdata/{sample}_2.fastq.gz"
+#     params:
+#         trimmomaticdir = config["trimmomaticdir"]
+#     threads: 2
+#     log: "logs/{sample}/TrimReads.log"
+#     output:
+#         r1 = "rawdata/{sample}_1.trimmed.fastq.gz",
+#         r2 = "rawdata/{sample}_2.trimmed.fastq.gz",
+#         utr1 = "rawdata/{sample}_1.trimmed.fastq.unpaired.gz",
+#         utr2 = "rawdata/{sample}_2.trimmed.fastq.unpaired.gz"
+#     conda:
+#         "envs/deeptools.yml"
+#     shell:
+#         """
+# java -jar {params.trimmomaticdir}/trimmomatic-0.39.jar \
+# PE -phred33 {input.r1} \
+# {input.r2} \
+# {output.r1} \
+# {output.utr1} \
+# {output.r2} \
+# {output.utr2} \
+# ILLUMINACLIP:{params.trimmomaticdir}/adapters/TruSeq3-PE.fa:2:30:10:8:true \
+# LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 \
+# 2> {log}
+#         """
+
+
+rule fastp:
     input:
         r1=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R1"],
         r2=lambda wildcards: peptable[peptable["sample_name"] == '{sample}'.format(sample=wildcards.sample)]["file_path_R2"]
-        # r1 = "rawdata/{sample}_1.fastq.gz",
-        # r2 = "rawdata/{sample}_2.fastq.gz"
     params:
-        trimmomaticdir = config["trimmomaticdir"]
-    threads: 2
-    log: "logs/{sample}/TrimReads.log"
+    threads: 6
+    log: "logs/{sample}/fastp.log"
     output:
-        r1 = "rawdata/{sample}_1.trimmed.fastq.gz",
-        r2 = "rawdata/{sample}_2.trimmed.fastq.gz",
-        utr1 = "rawdata/{sample}_1.trimmed.fastq.unpaired.gz",
-        utr2 = "rawdata/{sample}_2.trimmed.fastq.unpaired.gz"
+        r1 = "outs/{sample}/trimmedReads/{sample}_1.trimmed.fastq.gz",
+        r2 = "outs/{sample}/trimmedReads/{sample}_2.trimmed.fastq.gz",
+        json = "outs/{sample}/trimmedReads/fastp.json",
+        html = "outs/{sample}/trimmedReads/fastp.html"
     conda:
-        "envs/deeptools.yml"
+        "envs/qc.yml"
     shell:
         """
-java -jar {params.trimmomaticdir}/trimmomatic-0.39.jar \
-PE -phred33 {input.r1} \
-{input.r2} \
-{output.r1} \
-{output.utr1} \
-{output.r2} \
-{output.utr2} \
-ILLUMINACLIP:{params.trimmomaticdir}/adapters/TruSeq3-PE.fa:2:30:10:8:true \
-LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 \
-2> {log}
+fastp -i {input.r1} -I {input.r2} -o {output.r1} -O {output.r2} --json {output.json} --html {output.html} --detect_adapter_for_pe --thread {threads}
         """
 
+#"rawdata/X3TC_2.trimmed.fastq.gz"
 ###################### Bowtie2
 rule AlignBowtie2:
     input:
-        r1 = "rawdata/{sample}_1.trimmed.fastq.gz",
-        r2 = "rawdata/{sample}_2.trimmed.fastq.gz"
+        r1 = "outs/{sample}/trimmedReads/{sample}_1.trimmed.fastq.gz",
+        r2 = "outs/{sample}/trimmedReads/{sample}_2.trimmed.fastq.gz"
     params:
         index = config["bowtie2hs1index"]
     output:
@@ -335,8 +365,8 @@ rule bamstats:
 
 rule alignSTAR:
     input:
-        r1 = "rawdata/{sample}_1.trimmed.fastq.gz",
-        r2 = "rawdata/{sample}_2.trimmed.fastq.gz"
+        r1 = "outs/{sample}/trimmedReads/{sample}_1.trimmed.fastq.gz",
+        r2 = "outs/{sample}/trimmedReads/{sample}_2.trimmed.fastq.gz"
     params:
         index = config["starindex"],
         outdir = "outs/{sample}/star_output/"
@@ -799,6 +829,7 @@ rule repeatanalysis:
         counttypes = config["counttypes"],
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
+        activeelementminlength = config["activeelementminlength"],
         peptable = "conf/private/peptable.csv",
         contrast_colors =config["contrast_colors"],
         condition_colors =config["condition_colors"],
@@ -846,7 +877,50 @@ rule ideogram:
         "scripts/ideogram.R"
 
 
+rule getDEelementMSA:
+    input:
+        "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.bed"
+    params:
+        hs1fa = config["hs1sorted"],
+        consensus = config["teconsensus"],
+        outgroup = config["outgroup"]
+    conda:
+        "envs/evo.yml"
+    output:
+        fa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.fasta",
+        faWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.withconsensus.fasta",
+        faWithConsensusAndOutgroup = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.withconsensusandoutgroup.fasta",
+        aln = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.aln",
+        alnWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.WithConsensus.aln",
+        alnWithConsensusAndOutgroup = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.WithConsensusAndOutgroup.aln"
 
+    shell:
+        """
+bedtools getfasta -s -fullHeader -fi {params.hs1fa} -bed {input} -fo {output.fa}
+cat {params.consensus} {output.fa} > {output.faWithConsensus}
+cat {params.consensus} {params.outgroup} {output.fa} > {output.faWithConsensusAndOutgroup}
+mafft --auto {output.fa} > {output.aln}
+mafft --auto {output.faWithConsensus} > {output.alnWithConsensus}
+mafft --auto {output.faWithConsensusAndOutgroup} > {output.alnWithConsensusAndOutgroup}
+        """ 
+#expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.fasta", telocaltype = telocaltypes, contrast = contrasts, RTE = "L1HS", direciton = ["UP", "DOWN"])
+
+
+rule evoAnalysis:
+    input:
+        alnWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.WithConsensus.aln",
+        aln = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.aln"
+    conda:
+        "envs/evo.yml"
+    output:
+        alignment = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.alignment.pdf"
+        # msa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.msa.pdf",
+        # tree = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.tree.pdf",
+        # treeMSA = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.treeMSA.pdf"
+    script:
+        "scripts/evoAnalysis.R"
+
+#"results/agg/repeatanalysis/telocal_multi/condition_SEN_vs_PRO/AluY/deUP.alignment.pdf"
 rule deeptools_plotAggSignal:
     input:
         coverage = expand("outs/{sample}/{sample}_cov.bw", sample = samples)

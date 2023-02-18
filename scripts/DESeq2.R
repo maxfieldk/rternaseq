@@ -87,6 +87,17 @@ for (counttype in counttypes) {
     print(pcap)
     dev.off()
 
+    pcaplot = biplot(pcaObj,x="PC3", y = "PC4", showLoadings = FALSE,  gridlines.major = FALSE, gridlines.minor = FALSE, borderWidth = 0,
+    colby = 'condition', legendPosition = "right",
+    labSize = 5, pointSize = 5, sizeLoadingsNames = 5)
+    pcap = pcaplot +
+    theme_cowplot() +
+    theme(axis.line=element_blank(),aspect.ratio=1, panel.border = element_rect(color = "black", linetype = 1, linewidth = 1, fill = NA))
+    
+    pdf(paste(outputdir,counttype,"plots","pcaplotPC34.pdf", sep = '/'), width=7, height=6)
+    print(pcap)
+    dev.off()
+
     legend <- get_legend(
         # create some space to the left of the legend
         pcap + theme(legend.box.margin = margin(0, 0, 0, 1), legend.position = "right")

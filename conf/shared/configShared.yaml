@@ -63,6 +63,16 @@ namedmarkerlist:
   AluY: "box"
   HERVK-int: "triangle"
 
+activeelementminlength:
+  L1HS: 5999
+  AluY: 280
+  HERVK-int: 7000
+  L1PA2: 5000
+  L1PA3: 5000
+  L1PA4: 5000
+  L1PA5: 5000
+  L1PA6-9: 5000
+
 rtestoplot:
   - "L1HS"
   - "AluY"
@@ -74,3 +84,7 @@ genedensity:
   HERVK-int: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.AluY.density.bed4"
 
 karyotype: "/users/mkelsey/data/ref/genomes/hs1/karyotype.tsv"
+
+#need to use lists here since I'll be getting values in bash and it doesn't support dictionary nesting
+teconsensus: "/users/mkelsey/data/ref/sequences/l1hsconsensus.fa"
+outgroup: "/users/mkelsey/data/ref/sequences/l1hsconsensus.fa"

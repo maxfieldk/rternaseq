@@ -1,0 +1,35 @@
+name: evo
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+  - r
+dependencies:
+  - jupyter
+  - ipykernel
+  - ipython
+  - python
+  - bedtools
+  - mafft
+  - seqmagick=0.8
+  - seqkit
+  - samtools
+  - r-base
+  - r-seqinr
+  - r-irkernel
+  - r-tibble
+  - r-stringr
+  - r-readr
+  - r-dplyr
+  - r-ggplot2
+  - r-magrittr
+  - r-cowplot
+  - r-httpgd
+  - r-ape
+  - r-plotly
+  - r-phangorn
+  - r-ggplotify
+  - bioconductor-msa
+  - bioconductor-ggtree
+  - r-ggmsa
+
