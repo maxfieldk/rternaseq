@@ -56,7 +56,7 @@ except:
 
 rule all:
     input:
-        expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.alignment.pdf", telocaltype = telocaltypes, contrast = contrasts, RTE = "L1HS", direction = ["UP", "DOWN"])
+        expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.alignment.pdf", telocaltype = telocaltypes, contrast = contrasts, rte = ["L1HS", "AluY", "HERVK-int"], direction = ["UP", "DOWN"])
         
 ########################################################### Make folders
 if True:
@@ -768,25 +768,6 @@ rule clusterprofiler:
 
 
 
-rule pyGenomeTracks:
-    input:
-        bw = expand("outs/{sample}/{sample}_cov.bw", sample = samples),
-        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv"
-    params:
-        refseq = config["refseq"],
-        l1hs6kbintactbed = config["l1hs6kbintactbed"],
-        repeatsbed = config["repeatsbed"],
-        contrasts = config["contrasts"],
-        telocaltypes = config["telocaltypes"],
-        outputdir = "results/agg/repeatanalysis/genometracks"
-    conda:
-        "envs/deeptools.yml"
-    log:
-        "logs/agg/pyGenomeTracks.log"
-    output:
-        outfile = "results/agg/repeatanalysis/genometracks/outfile.txt"
-    script:
-        "scripts/pygenometracks.sh"
 
 
 rule gvizreduxParallel:
@@ -816,20 +797,17 @@ rule gvizreduxParallel:
     script:
         "scripts/gviz.R"
 
-
-
-
-
 rule repeatanalysis:
     input:
         deseq = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
         telocal = expand("outs/{sample}/TElocal/{sample}_{maptype}.cntTable", sample = samples, maptype = ["multi", "uniq"])
     params:
+        repeatanalysis = config["repeatanalysis"],
         contrasts = config["contrasts"],
         counttypes = config["counttypes"],
         telocaltypes = config["telocaltypes"],
         levelslegendmap = config["levelslegendmap"],
-        activeelementminlength = config["activeelementminlength"],
+        lengthreq = config["lengthreq"],
         peptable = "conf/private/peptable.csv",
         contrast_colors =config["contrast_colors"],
         condition_colors =config["condition_colors"],
@@ -850,13 +828,13 @@ rule repeatanalysis:
         DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
-        "scripts/repeatanalysis.R"
+        "scripts/saveimage.R"
 
 
 
 rule ideogram:
     input:
-        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
+        DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv"
     params:
         contrasts = config["contrasts"],
         telocaltypes = config["telocaltypes"],
@@ -879,26 +857,32 @@ rule ideogram:
 
 rule getDEelementMSA:
     input:
-        "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.bed"
+        "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.bed"
     params:
+        consensus = "/users/mkelsey/data/ref/sequences/{rte}consensus.fa",
         hs1fa = config["hs1sorted"],
-        consensus = config["teconsensus"],
-        outgroup = config["outgroup"]
+        outgroup = "/users/mkelsey/data/ref/sequences/{rte}outgroup.fa"
     conda:
         "envs/evo.yml"
     output:
-        fa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.fasta",
-        faWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.withconsensus.fasta",
-        faWithConsensusAndOutgroup = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.withconsensusandoutgroup.fasta",
-        aln = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.aln",
-        alnWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.WithConsensus.aln",
-        alnWithConsensusAndOutgroup = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.WithConsensusAndOutgroup.aln"
+        fa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.fasta",
+        faWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.withconsensus.fasta",
+        faWithConsensusAndOutgroup = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.withconsensusandoutgroup.fasta",
+        aln = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.aln",
+        alnWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.WithConsensus.aln",
+        alnWithConsensusAndOutgroup = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.WithConsensusAndOutgroup.aln"
 
     shell:
         """
 bedtools getfasta -s -fullHeader -fi {params.hs1fa} -bed {input} -fo {output.fa}
-cat {params.consensus} {output.fa} > {output.faWithConsensus}
-cat {params.consensus} {params.outgroup} {output.fa} > {output.faWithConsensusAndOutgroup}
+cat {params.consensus} > {output.faWithConsensus}
+echo >> {output.faWithConsensus}
+cat {output.fa} >> {output.faWithConsensus}
+cat {params.consensus} > {output.faWithConsensusAndOutgroup} 
+echo >> {output.faWithConsensusAndOutgroup}
+cat {params.outgroup} >> {output.faWithConsensusAndOutgroup}
+echo >> {output.faWithConsensusAndOutgroup}
+cat {output.fa} >> {output.faWithConsensusAndOutgroup}
 mafft --auto {output.fa} > {output.aln}
 mafft --auto {output.faWithConsensus} > {output.alnWithConsensus}
 mafft --auto {output.faWithConsensusAndOutgroup} > {output.alnWithConsensusAndOutgroup}
@@ -913,10 +897,10 @@ rule evoAnalysis:
     conda:
         "envs/evo.yml"
     output:
-        alignment = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.alignment.pdf"
-        # msa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.msa.pdf",
-        # tree = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.tree.pdf",
-        # treeMSA = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.treeMSA.pdf"
+        alignment = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.alignment.pdf",
+        msa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.msa.pdf",
+        tree = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.tree.pdf",
+        treeMSA = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.treeMSA.pdf"
     script:
         "scripts/evoAnalysis.R"
 

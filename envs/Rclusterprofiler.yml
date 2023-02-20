@@ -19,4 +19,4 @@ dependencies:
   - bioconductor-enrichplot
   - bioconductor-AnnotationDbi
   - bioconductor-pathview
-
+  - r-paleteer

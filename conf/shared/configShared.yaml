@@ -73,10 +73,44 @@ activeelementminlength:
   L1PA5: 5000
   L1PA6-9: 5000
 
+lengthreq:
+  'L1': 0
+  'Alu': 0
+  'ERVK': 0
+  'L1HS': 5999
+  'AluY': 280
+  'HERVK-int': 7000
+  'L1PA2': 5000
+  'L1PA3': 5000
+  'L1PA4': 5000
+  'L1PA5': 5000
+  'L1PA6-9': 5000
+
+
 rtestoplot:
   - "L1HS"
   - "AluY"
   - "HERVK-int"
+
+
+repeatanalysis:
+  'Family':
+    'L1': 'L1:LINE'
+    'Alu': 'Alu:SINE'
+    'ERVK': 'ERVK:LTR'
+  'ActiveFamily':
+    'L1HS': 'L1HS:L1'
+    'AluY': 'AluY:Alu'
+    'HERVK-int': 'HERVK(.)*int'
+  'Subfamily':
+    'L1HS': 'L1HS:L1'
+    'AluY': 'AluY:Alu'
+    'HERVK-int': 'HERVK(.)*int'
+    'L1PA2': 'L1PA2:L1'
+    'L1PA3': 'L1PA3:L1'
+    'L1PA4': 'L1PA4:L1'
+    'L1PA5': 'L1PA5:L1'
+    'L1PA6-9': 'L1PA[6789]{1}:L1'
 
 genedensity:
   L1HS: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.L1HS.density.bed4"
@@ -85,6 +119,9 @@ genedensity:
 
 karyotype: "/users/mkelsey/data/ref/genomes/hs1/karyotype.tsv"
 
-#need to use lists here since I'll be getting values in bash and it doesn't support dictionary nesting
-teconsensus: "/users/mkelsey/data/ref/sequences/l1hsconsensus.fa"
-outgroup: "/users/mkelsey/data/ref/sequences/l1hsconsensus.fa"
+L1HSconsensus: "/users/mkelsey/data/ref/sequences/L1HSconsensus.fa"
+AluYconsensus: "/users/mkelsey/data/ref/sequences/AluYconsensus.fa"
+HERVK-intconsensus: "/users/mkelsey/data/ref/sequences/HERVK-intconsensus.fa"
+L1HSoutgroup: "/users/mkelsey/data/ref/sequences/L1HSconsensus.fa"
+AluYoutgroup: "/users/mkelsey/data/ref/sequences/AluJbconsensus.fa"
+HERVK-intoutgroup: "/users/mkelsey/data/ref/sequences/HERVL-intconsensus.fa"

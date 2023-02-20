@@ -1,6 +1,5 @@
 library("readr")
 library("stringr")
-library("dplyr")
 library("ggplot2")
 library("tibble")
 library("RColorBrewer")
@@ -14,6 +13,7 @@ library("rtracklayer")
 library("trackViewer")
 library("org.Hs.eg.db")
 library("RIdeogram")
+library("dplyr")
 
 save.image()
 
@@ -42,7 +42,7 @@ get_ideogram_labels <- function(
         "AluYDOWN" = "0be7e4",
         "HERVK-intDOWN" = "8c00ff"
     )) {
-    tempdf <- rtedf[, c(1, 3, 4, 5, 7)]
+    tempdf <- rtedf %>% dplyr::select(c(Subfamily, chr, start, stop, direction))
     colnames(tempdf) <- c("Kind", "Chr", "Start", "End", "Direction")
     tempdf <- tempdf %>%
         filter(Kind %in% elementlist) %>%
@@ -75,7 +75,7 @@ makeIdeogram <- function(
     genedensity$End <- as.numeric(genedensity$End)
     genedensity$Value <- as.integer(genedensity$Value)
 
-    dertes <- read.delim(rtedf, sep = "\t", header = FALSE)
+    dertes <- read.delim(rtedf, sep = "\t", header = TRUE)
     rownames(dertes) <- 1:nrow(dertes)
 
     labels <- get_ideogram_labels(dertes, elementlist,

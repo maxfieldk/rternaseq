@@ -19,14 +19,13 @@ refseq <- snakemake@params[["refseq"]]
 genes <- snakemake@params[["genes"]]
 l1hs6kbintactbed <- snakemake@params[["l1hs6kbintactbed"]]
 repeats <- snakemake@params[["repeats"]]
-mapper <- read.delim(snakemake@params[["telocalmapping"]], sep = "\t")
 peptable <- read.csv(snakemake@params[["peptable"]])
 samples <- peptable$sample_name
 ideodf <- snakemake@params[["ideogram"]]
 ideodf <- "/users/mkelsey/data/ref/genomes/hs1/annotations2/ideogramWithStain.bed"
 levels <- snakemake@params[["levels"]]
 condition_colors <- snakemake@params[["condition_colors"]]
-dertes <- read.delim(snakemake@input[["DETEsbyContrast"]], header = FALSE)
+dertes <- read.delim(snakemake@input[["DETEsbyContrast"]], header = TRUE)
 outputdir <- snakemake@params[["outputdir"]]
 contrast <- snakemake@wildcards[["contrast"]]
 rtekind <- snakemake@wildcards[["rtekind"]]
@@ -46,22 +45,22 @@ options(Gviz.scheme = "myScheme")
 # scheme$GeneRegionTrack$shape <- c("smallArrow", "arrow")
 
 
-tab <- table(mapper$TE)
-getPos <- function(rte, tab) {
-    if (unname(tab[rte]) > 1) {
-        return(NULL)
-    } else {
-        rterow <- mapper %>% filter(TE == rte)
-        val <- rterow["chromosome.start.stop.strand"]
-        chr <- str_split(val, ":")[[1]][1]
-        coords <- str_split(val, ":")[[1]][2]
-        strand <- str_split(val, ":")[[1]][3]
-        start <- str_split(coords, "-")[[1]][1]
-        stop <- str_split(coords, "-")[[1]][2]
+# tab <- table(mapper$TE)
+# getPos <- function(rte, tab) {
+#     if (unname(tab[rte]) > 1) {
+#         return(NULL)
+#     } else {
+#         rterow <- mapper %>% filter(TE == rte)
+#         val <- rterow["chromosome.start.stop.strand"]
+#         chr <- str_split(val, ":")[[1]][1]
+#         coords <- str_split(val, ":")[[1]][2]
+#         strand <- str_split(val, ":")[[1]][3]
+#         start <- str_split(coords, "-")[[1]][1]
+#         stop <- str_split(coords, "-")[[1]][2]
 
-        return(list(chr = chr, start = as.numeric(start), stop = as.numeric(stop), strand = strand))
-    }
-}
+#         return(list(chr = chr, start = as.numeric(start), stop = as.numeric(stop), strand = strand))
+#     }
+# }
 
 genome <- "hs1"
 ideodf <- read.delim(ideodf, header = TRUE)
@@ -115,19 +114,18 @@ for (i in seq(length(bamsubset))) {
 }
 
 ######
-dertelist <- dertes[dertes$V9 == telocaltype & dertes$V8 == contrast & dertes$V1 == rtekind, ]$V2
-for (rte in dertelist) {
+dertedf <- dertes[dertes$telocaltype == telocaltype & dertes$contrast == contrast & dertes$Subfamily == rtekind, ]
+for (rte in dertedf$teorgenename) {
     dirname <- file.path(outputdir, telocaltype, contrast, rtekind, rte)
     dir.create(dirname, recursive = TRUE)
-    rterow <- dertes[dertes$V1 == rte]
-    direction <- rterow$V6
-    location <- getPos(rte, tab)
+    rterow <- dertedf[dertedf$teorgenename == rte]
+    direction <- rterow$direction
     genome <- "hs1"
-    chr <- location["chr"][[1]]
-    strand <- location["strand"][[1]]
-    start <- location["start"][[1]]
-    stop <- location["stop"][[1]]
-    length <- stop - start
+    chr <- rterow$chr
+    strand <- rterow$strand
+    start <- rterow$start
+    stop <- rterow$stop
+    length <- rterow$length
     gtrack <- GenomeAxisTrack(name = paste0(length, "bp"))
 
     tracks <- c(gtrack, alignmentTrackList, repeatTrack, genesTrack)

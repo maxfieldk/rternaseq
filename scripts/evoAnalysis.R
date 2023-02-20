@@ -10,6 +10,7 @@ library(ggplotify)
 library(plotly)
 library(Biostrings)
 library(phangorn)
+save.image()
 alnFile <- snakemake@input[["alnWithConsensus"]]
 aln <- read.dna(alnFile, "fasta")
 
@@ -26,18 +27,18 @@ dev.off()
 # #### Get distances using ape and then build tree with phangorn
 # d <- dist.dna(aln, pairwise.deletion = TRUE)
 
-# try({{treeUPGMA <- upgma(d)
-# treeNJ <- nj(d)
-# tp <- ggplot(treeUPGMA, aes(x, y)) +
-#     geom_tiplab() +
-#     geom_tree() +
-#     theme_tree() +
-#     xlim(0, 0.2) +
-#     geom_treescale()
+try({{treeUPGMA <- upgma(d)
+treeNJ <- nj(d)
+tp <- ggplot(treeUPGMA, aes(x, y)) +
+    geom_tiplab() +
+    geom_tree() +
+    theme_tree() +
+    xlim(0, 0.2) +
+    geom_treescale()
 
-# pdf(snakemake@output[["tree"]], 6, 4)
-# print(tp)
-# dev.off()
+pdf(snakemake@output[["tree"]], 6, 4)
+print(tp)
+dev.off()
 
 # datat = tidy_msa(alnFile, 180, 208)
 # tp + geom_facet(geom = geom_msa, data = alnFile,  panel = 'msa', color = "Chemistry_AA")

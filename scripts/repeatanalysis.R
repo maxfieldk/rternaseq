@@ -27,7 +27,6 @@ contrast_colors <- snakemake@params[["contrast_colors"]]
 contrast_colors <- unname(unlist(contrast_colors))
 condition_colors <- snakemake@params[["condition_colors"]]
 condition_colors <- unname(unlist(condition_colors))
-repeatsannotated <- read_table(snakemake@params[["repeatsannotatted"]], col_names = FALSE)
 telocalrepeatsannotated <- read_table(snakemake@params[["telocalmapping"]], col_names = FALSE)
 ######## MAIN FUNCTIONS
 #### GENERAL UTILITY
@@ -190,27 +189,29 @@ euPlot <- function(fit, contrasts, fill = factor(c("blue", "red"), ordered = TRU
 contrasts <- snakemake@params[["contrasts"]]
 levelslegendmap <- snakemake@params[["levelslegendmap"]]
 telocaltypes <- snakemake@params[["telocaltypes"]]
-activeelementminlength <- snakemake@params[["activeelementminlength"]]
+lengthreq <- snakemake@params[["lengthreq"]]
 
-for (counttype in telocaltypes) {
+
+dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), intron = character(), exon = character(), region = character(), stringsAsFactors = FALSE)
+for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
+        outputdir <- paste(snakemake@params[["outputdir"]], telocaltype, sep = "/")
+
+        forBedUP <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
+        forBedDOWN <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
         ####### DATA WRANGLING
         contrast_level_2 <- unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
         contrast_base_level <- unlist(strsplit(contrast, "_", fixed = TRUE))[[4]]
         conditions <- c(contrast_base_level, contrast_level_2)
 
-        ddsres <- read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
-        ddscounts <- read_csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "counttablesizenormed.csv", sep = "/"))
-        ddsrlogcounts <- read_csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "rlogcounts.csv", sep = "/"))
+        ddsres <- read.csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "results.csv", sep = "/"))
+        ddscounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "counttablesizenormed.csv", sep = "/"))
+        ddsrlogcounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "rlogcounts.csv", sep = "/"))
 
-        outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
 
         colnames(ddsres)[1] <- "Geneid"
         colnames(ddscounts)[1] <- "Geneid"
         colnames(ddsrlogcounts)[1] <- "Geneid"
-
-
-
 
         avoidzero <- 1
         meancols <- c()
@@ -267,33 +268,14 @@ for (counttype in telocaltypes) {
         genes <- results$Geneid
 
 
-        pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR")
-        names(pattern) <- c("L1", "Alu", "ERVK")
-        classification <- "Family"
-        results[classification] <- "Other"
-        for (e in names(pattern)) {
-            matches <- grep(pattern[[e]], genes)
-            results[matches, classification] <- e
-        }
-
-        pattern <- list("L1HS:L1", "AluY:Alu", "HERVK(.)*int")
-        names(pattern) <- c("L1HS", "AluY", "HERVK-int")
-        classification <- "Subfamily"
-        results[classification] <- "Other"
-        for (e in names(pattern)) {
-            matches <- grep(pattern[[e]], genes)
-            results[matches, ] %>% filter(length > activeelementminlength[[e]])
-            results[matches, classification] <- e
-        }
-
-        # nevermind, only put same ontology in a column
-        pattern <- list("L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
-        names(pattern) <- c("L1HS", "AluY", "HERVK-int", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
-        classification <- "RTE"
-        results[classification] <- "Other"
-        for (e in names(pattern)) {
-            matches <- grepl(pattern[[e]], genes) & results[, "length"] > activeelementminlength[[e]]
-            results[matches, classification] <- e
+        repTEs <- snakemake@params[["repeatanalysis"]]
+        for (classification in names(repTEs)) {
+            results[classification] <- "Other"
+            for (TE in names(repTEs[[classification]])) {
+                pattern <- repTEs[[classification]][[TE]]
+                matches <- grepl(pattern, genes)
+                results[matches & (results[, "length"] > lengthreq[[TE]]), classification] <- TE
+            }
         }
 
         ################################################ PLOTING
@@ -313,7 +295,7 @@ for (counttype in telocaltypes) {
 
         # scatter plots
         scatterplotsNoAnnotations <- list()
-        classificationlevels <- c("RTE", "Family")
+        classificationlevels <- c("Subfamily", "Family")
         for (classificationlevel in classificationlevels) {
             print(classificationlevel)
             if (classificationlevel == "Family") {
@@ -337,7 +319,7 @@ for (counttype in telocaltypes) {
         }
 
         scatterplotsHighlyAnnotated <- list()
-        classificationlevels <- c("RTE", "Family")
+        classificationlevels <- c("Subfamily", "Family")
         for (classificationlevel in classificationlevels) {
             print(classificationlevel)
             if (classificationlevel == "Family") {
@@ -361,7 +343,7 @@ for (counttype in telocaltypes) {
         }
 
         scatterplots <- list()
-        classificationlevels <- c("RTE", "Family")
+        classificationlevels <- c("Subfamily", "Family")
         for (classificationlevel in classificationlevels) {
             print(classificationlevel)
             if (classificationlevel == "Family") {
@@ -386,7 +368,7 @@ for (counttype in telocaltypes) {
 
         # violin plots
         violinplots <- list()
-        classificationlevels <- c("RTE", "Family", "Subfamily")
+        classificationlevels <- c("Subfamily", "Family", "ActiveFamily")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel, groupByRegion = TRUE)
             dirname <- file.path(outputdir, contrast)
@@ -398,7 +380,7 @@ for (counttype in telocaltypes) {
         }
 
         L1violinplots <- list()
-        classificationlevels <- c("RTE")
+        classificationlevels <- c("Subfamily")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel, repeattypesallowed = c("L1"), groupByRegion = TRUE)
             dirname <- file.path(outputdir, contrast)
@@ -412,7 +394,7 @@ for (counttype in telocaltypes) {
         ####### region plots
 
         regionplots <- list()
-        classificationlevels <- c("RTE", "Family", "Subfamily")
+        classificationlevels <- c("Subfamily", "Family", "ActiveFamily")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel)
             dirname <- file.path(outputdir, contrast)
@@ -428,7 +410,7 @@ for (counttype in telocaltypes) {
         ###### First with annotations
         # Active RTE
         legend <- get_legend(scatterplots[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["Subfamily"]],
+        p <- plot_grid(violinplots[["ActiveFamily"]],
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
             scatterplots[["AluY"]] + theme(legend.position = "none"),
             scatterplots[["HERVK-int"]] + theme(legend.position = "none"),
@@ -463,13 +445,13 @@ for (counttype in telocaltypes) {
         dev.off()
 
 
-        ########## Plot Subfamily and family together
+        ########## Plot ActiveFamily and family together
         legend <- get_legend(scatterplots[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
         p <- plot_grid(violinplots[["Family"]],
             scatterplots[["L1"]] + theme(legend.position = "none"),
             scatterplots[["Alu"]] + theme(legend.position = "none"),
             scatterplots[["ERVK"]] + theme(legend.position = "none"),
-            violinplots[["Subfamily"]],
+            violinplots[["ActiveFamily"]],
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
             scatterplots[["AluY"]] + theme(legend.position = "none"),
             scatterplots[["HERVK-int"]] + theme(legend.position = "none"),
@@ -487,7 +469,7 @@ for (counttype in telocaltypes) {
 
         ########## L1 together plot
         legend <- get_legend(scatterplots[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(L1violinplots[["RTE"]],
+        p <- plot_grid(L1violinplots[["Subfamily"]],
             scatterplots[["L1"]] + theme(legend.position = "none"),
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
             scatterplots[["L1PA2"]] + theme(legend.position = "none"),
@@ -511,7 +493,7 @@ for (counttype in telocaltypes) {
         ############## Same together plots but without the annotations
         # Active RTE
         legend <- get_legend(scatterplotsNoAnnotations[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(violinplots[["Subfamily"]],
+        p <- plot_grid(violinplots[["ActiveFamily"]],
             scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["AluY"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["HERVK-int"]] + theme(legend.position = "none"),
@@ -546,13 +528,13 @@ for (counttype in telocaltypes) {
         dev.off()
 
 
-        ########## Plot Subfamily and family together
+        ########## Plot ActiveFamily and family together
         legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
         p <- plot_grid(violinplots[["Family"]],
             scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["Alu"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["ERVK"]] + theme(legend.position = "none"),
-            violinplots[["Subfamily"]],
+            violinplots[["ActiveFamily"]],
             scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["AluY"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["HERVK-int"]] + theme(legend.position = "none"),
@@ -570,7 +552,7 @@ for (counttype in telocaltypes) {
 
         ########## L1 together plot
         legend <- get_legend(scatterplotsNoAnnotations[["L1"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
-        p <- plot_grid(L1violinplots[["RTE"]],
+        p <- plot_grid(L1violinplots[["Subfamily"]],
             scatterplotsNoAnnotations[["L1"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["L1PA2"]] + theme(legend.position = "none"),
@@ -590,8 +572,69 @@ for (counttype in telocaltypes) {
 
 
         ################################################ END#PLOTING
+        ################################################ Build dedf and beddfs
+        repTEs <- snakemake@params[["repeatanalysis"]]
+        testosave <- repTEs[["Subfamily"]]
+        dedfLvl2 <- results %>%
+            filter(padj < 0.05 & Subfamily %in% names(testosave)) %>%
+            dplyr::mutate(direction = ifelse(log2FoldChange > 0, "UP", "DOWN")) %>%
+            dplyr::mutate(contrast = contrast) %>%
+            dplyr::mutate(telocaltype = telocaltype) %>%
+            dplyr::select(c(Subfamily, teorgenename, chr, start, stop, strand, direction, contrast, telocaltype, length, intronOverlapCount, exonOverlapCount, region))
+        subfamilies <- dedfLvl2$Subfamily %>% unique()
+        for (subfamily in subfamilies) {
+            bedUP <- dedfLvl2 %>%
+                filter(direction == "UP") %>%
+                filter(Subfamily == subfamily) %>%
+                mutate(score = 1000) %>%
+                dplyr::select(c(chr, start, stop, teorgenename, score, strand))
+            bedDOWN <- dedfLvl2 %>%
+                filter(direction == "DOWN") %>%
+                filter(Subfamily == subfamily) %>%
+                mutate(score = 1000) %>%
+                dplyr::select(c(chr, start, stop, teorgenename, score, strand))
+            dirname <- file.path(outputdir, telocaltype, contrast, subfamily)
+            dir.create(dirname, recursive = TRUE)
+            write.table(bedUP, file.path(dirname, "deUP.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+            write.table(bedDOWN, file.path(dirname, "deDOWN.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+        }
+    }
+    dedf <- rbind(dedf, dedfLvl2)
+}
+
+
+########### Are de RTEs the same?
+
+# this will be: for each counttype, what RTEs were DE in all contrasts
+# AND for each contrast which TEs were DE in both counttypes
+for (telocaltype in telocaltypes) {
+    newcol1 <- paste0("sharedAmongContrasts", "In", telocaltype)
+    dedf[newcol1] <- "No"
+    for (direction in directions) {
+        tetypes <- dedf$Subfamily %>% unique()
+        for (tetype in tetypes) {
+            tempdf <- dedf %>%
+                filter(telocaltype == telocaltype & direction == direction & Subfamily == tetype) %>%
+                dplyr::select(teorgenename)
+            ecounts <- table(tempdf)
+            sharedContrast <- names(ecounts[ecounts > 1])
+            dedf[dedf$teorgenename %in% sharedContrast, newcol1] <- "Yes"
+
+            for (contrast in contrasts) {
+                newcol2 <- paste0("sharedAmongCountypes", "In", contrast)
+                dedf[[newcol2]] <- "No"
+                tempdf <- dedf %>%
+                    filter(contrast == contrast & direction == direction & Subfamily == tetype) %>%
+                    dplyr::select(teorgenename)
+                ecounts <- table(tempdf)
+                sharedCountype <- names(ecounts[ecounts > 1])
+                dedf[dedf$teorgenename %in% sharedCountype, newcol2] <- "Yes"
+            }
+        }
     }
 }
+######## Write final dedf to file
+write.table(dedf, file = snakemake@output[["DETEsbyContrast"]], quote = FALSE, col.names = TRUE, row.names = FALSE, sep = "\t")
 
 # Note on p-values set to NA: some values in the results table can be set to NA for one of the following reasons:
 
@@ -632,112 +675,6 @@ for (counttype in snakemake@params[["counttypes"]]) {
 }
 
 ################################################
-master_deRTEs <- list()
-for (direction in c("UP", "DOWN")) {
-    counttype_deRTEs <- list()
-    for (counttype in snakemake@params[["telocaltypes"]]) {
-        outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
-        pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA(.){0,2}:L1", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
-        names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int", "L1PA", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
-        deRTEs <- list()
-        for (e in names(pattern)) {
-            rte <- e
-            contrastL <- list()
-            for (contrast in contrasts) {
-                df <- read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
-                colnames(df)[1] <- "Geneid"
-                matches <- grep(pattern[e], df$Geneid)
-                searched_element <- df[matches, ]
-                if (direction == "UP") {
-                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange > 0, "Geneid"] %>% na.omit())
-                } else {
-                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange < 0, "Geneid"] %>% na.omit())
-                }
-                names(sigsearched) <- gsub("condition_", "", contrast)
-                contrastL <- c(contrastL, sigsearched)
-            }
-            deRTEs[[e]] <- contrastL
-        }
-        counttype_deRTEs[[counttype]] <- deRTEs
-    }
-    master_deRTEs[[direction]] <- counttype_deRTEs
-}
-
-
-####### Write the DE results to table
-mapper <- read.delim(snakemake@params[["telocalmapping"]], sep = "\t", header = FALSE)
-#### functions
-getPos <- function(rte, tab) {
-    rterow <- mapper %>%
-        filter(V4 == rte) %>%
-        group_by(V4) %>%
-        summarize(
-            chr = dplyr::first(V1),
-            start = min(V2),
-            stop = max(V3),
-            name = dplyr::first(V4),
-            bs = dplyr::first(V5),
-            strand = dplyr::first(V6),
-            intron = max(V7),
-            exon = max(V8)
-        )
-    return(list(chr = rterow$chr, start = as.numeric(rterow$start), stop = as.numeric(rterow$stop), strand = rterow$strand, intron = as.numeric(rterow$intron), exon = as.numeric(rterow$exon)))
-}
-outputdir <- snakemake@params[["outputdir"]]
-
-dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), intron = character(), exon = character(), region = character(), stringsAsFactors = FALSE)
-i <- 1
-rtenames <- c("L1HS", "AluY", "HERVK-int", "L1PA2", "L1PA3", "L1PA4")
-for (direction in c("UP", "DOWN")) {
-    for (name in rtenames) {
-        for (telocaltype in telocaltypes) {
-            for (contrast in contrasts) {
-                elements <- master_deRTEs[[direction]][[telocaltype]][[name]][[gsub("condition_", "", contrast)]]
-                forBedUP <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
-                forBedDOWN <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
-                bedUpi <- 1
-                bedDowni <- 1
-                for (rte in elements) {
-                    rte <- str_split(rte, ":")[[1]][1]
-                    print(rte)
-                    location <- getPos(rte, tab)
-                    if (is.null(location)) {
-                        next
-                    }
-                    chr <- location["chr"][[1]]
-                    start <- location["start"][[1]]
-                    stop <- location["stop"][[1]]
-                    strand <- location["strand"][[1]]
-                    length <- stop - start
-                    intron <- location["intron"][[1]]
-                    exon <- location["exon"][[1]]
-                    region <- ifelse(intron > 0, "intron", ifelse(exon > 0, "exon", "other"))
-
-                    vec <- c(chr, start, stop, rte, 1000, strand)
-                    if (direction == "UP") {
-                        forBedUP[bedUpi, ] <- vec
-                        bedUpi <- bedUpi + 1
-                    } else {
-                        forBedDOWN[bedDowni, ] <- vec
-                        bedDowni <- bedDowni + 1
-                    }
-                    vec <- c(name, rte, chr, start, stop, strand, direction, contrast, telocaltype, length, intron, exon, region)
-                    dedf[i, ] <- vec
-                    i <- i + 1
-                }
-                if (direction == "UP") {
-                    write.table(forBedUP, file.path(outputdir, telocaltype, contrast, name, "deUP.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-                } else {
-                    write.table(forBedDOWN, file.path(outputdir, telocaltype, contrast, name, "deDOWN.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-                }
-            }
-        }
-    }
-}
-
-write.table(dedf, file = snakemake@output[["DETEsbyContrast"]], quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
-
-head(dedf)
 outputdir <- paste(snakemake@params[["outputdir"]], sep = "/")
 
 for (counttype in telocaltypes) {
@@ -774,46 +711,41 @@ for (counttype in telocaltypes) {
 
 
 
-########### Are de RTEs the same?
 
-# this will be: for each counttype, what RTEs were DE in all contrasts
-shared_des_master <- list()
+
+############ Calculating significance of overalps
+master_deRTEs <- list()
 for (direction in c("UP", "DOWN")) {
-    des_by_counttype <- list()
+    counttype_deRTEs <- list()
     for (counttype in snakemake@params[["telocaltypes"]]) {
         outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
         pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA(.){0,2}:L1", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
         names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int", "L1PA", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
-        des <- list()
+        deRTEs <- list()
         for (e in names(pattern)) {
-            decontrast <- list()
+            rte <- e
+            contrastL <- list()
             for (contrast in contrasts) {
-                decontrast <- c(decontrast, list(master_deRTEs[[direction]][[counttype]][[e]][[gsub("condition_", "", contrast)]]))
+                df <- read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
+                colnames(df)[1] <- "Geneid"
+                matches <- grep(pattern[e], df$Geneid)
+                searched_element <- df[matches, ]
+                if (direction == "UP") {
+                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange > 0, "Geneid"] %>% na.omit())
+                } else {
+                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange < 0, "Geneid"] %>% na.omit())
+                }
+                names(sigsearched) <- gsub("condition_", "", contrast)
+                contrastL <- c(contrastL, sigsearched)
             }
-            set_des <- Reduce(intersect, decontrast)
-            des[[e]] <- set_des
+            deRTEs[[e]] <- contrastL
         }
-        des_by_counttype[[counttype]] <- des
+        counttype_deRTEs[[counttype]] <- deRTEs
     }
-    shared_des_master[[direction]] <- des_by_counttype
+    master_deRTEs[[direction]] <- counttype_deRTEs
 }
 
-# this will be: for each RTE, which were DE in all contrasts AND for all count methods
-des_by_rte_master <- list()
-for (direction in c("UP", "DOWN")) {
-    des_by_rte <- list()
-    for (e in names(pattern)) {
-        des <- list()
-        for (countype in snakemake@params[["telocaltypes"]]) {
-            des <- c(des, list(shared_des_master[[direction]][[counttype]][[e]]))
-        }
-        set_des <- Reduce(intersect, des)
-        des_by_rte[[e]] <- set_des
-    }
-    des_by_rte_master[[direction]] <- des_by_rte
-}
-
-############ Calculating significance of overalps
+head(dedf)
 
 ## For stats purposes
 telocalcountsample1 <- read.csv(snakemake@input[["telocal"]][[1]])
@@ -938,32 +870,32 @@ for (direction in c("UP", "DOWN")) {
 
 ################# write table for DEs shared amongst all constrasts
 
-dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), length = numeric(), stringsAsFactors = FALSE)
-i <- 1
-rtenames <- c("L1HS", "AluY", "HERVK-int")
-for (direction in c("UP", "DOWN")) {
-    for (name in rtenames) {
-        dertelist <- des_by_rte_master[[direction]][[name]]
-        print(name)
-        for (rte in dertelist) {
-            rte <- str_split(rte, ":")[[1]][1]
-            print(rte)
-            location <- getPos(rte, tab)
-            if (is.null(location)) {
-                next
-            }
-            chr <- location["chr"][[1]]
-            start <- location["start"][[1]]
-            stop <- location["stop"][[1]]
-            strand <- location["strand"][[1]]
-            length <- stop - start
-            vec <- c(name, rte, chr, start, stop, strand, direction, length)
-            dedf[i, ] <- vec
-            i <- i + 1
-        }
-    }
-}
-write.table(dedf, file = snakemake@output[["sharedamongallcontrasts_derte"]], quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
+# dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), length = numeric(), stringsAsFactors = FALSE)
+# i <- 1
+# rtenames <- c("L1HS", "AluY", "HERVK-int")
+# for (direction in c("UP", "DOWN")) {
+#     for (name in rtenames) {
+#         dertelist <- des_by_rte_master[[direction]][[name]]
+#         print(name)
+#         for (rte in dertelist) {
+#             rte <- str_split(rte, ":")[[1]][1]
+#             print(rte)
+#             location <- getPos(rte, tab)
+#             if (is.null(location)) {
+#                 next
+#             }
+#             chr <- location["chr"][[1]]
+#             start <- location["start"][[1]]
+#             stop <- location["stop"][[1]]
+#             strand <- location["strand"][[1]]
+#             length <- stop - start
+#             vec <- c(name, rte, chr, start, stop, strand, direction, length)
+#             dedf[i, ] <- vec
+#             i <- i + 1
+#         }
+#     }
+# }
+# write.table(dedf, file = snakemake@output[["sharedamongallcontrasts_derte"]], quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
 
 #################### RTE in genome histograms
 outputdir <- snakemake@params[["outputdir"]]
@@ -1017,3 +949,23 @@ x <- data.frame()
 write.table(x, file = snakemake@output[["outfile"]], col.names = FALSE)
 save.image()
 #############
+
+
+mapper <- read.delim(snakemake@params[["telocalmapping"]], sep = "\t", header = FALSE)
+# #### functions
+# getPos <- function(rte, tab) {
+#     rterow <- mapper %>%
+#         filter(V4 == rte) %>%
+#         group_by(V4) %>%
+#         summarize(
+#             chr = dplyr::first(V1),
+#             start = min(V2),
+#             stop = max(V3),
+#             name = dplyr::first(V4),
+#             bs = dplyr::first(V5),
+#             strand = dplyr::first(V6),
+#             intron = max(V7),
+#             exon = max(V8)
+#         )
+#     return(list(chr = rterow$chr, start = as.numeric(rterow$start), stop = as.numeric(rterow$stop), strand = rterow$strand, intron = as.numeric(rterow$intron), exon = as.numeric(rterow$exon)))
+# }
