@@ -241,10 +241,11 @@ for (i in seq(10)) {
 
 
 
-for (genelistname in names(genelists)[1]) {
+for (genelistname in names(genelists)) {
     plots <- list()
-    # only include up to the first 50 genes in a plot list
-    for (gene in genelists[[genelistname]][1:40]) {
+    plotslog <- list()
+    # only include up to the first 16 genes in a plot list
+    for (gene in genelists[[genelistname]][1:16]) {
         if (gene %in% colnames(counts)) {
             # first create a grouped summary for the bar plot
             gd <- counts %>%
@@ -258,24 +259,39 @@ for (genelistname in names(genelists)[1]) {
                 geom_col(data = gd, aes(x = factor(condition, level = levels), y = .data[[gene]], fill = factor(condition, level = levels)), color = "black") +
                 geom_point(aes(x = factor(condition, level = levels), y = .data[[gene]]), position = position_dodge2(width = 0.2)) +
                 theme_cowplot() +
+                theme(aspect.ratio=1) +
                 scale_fill_manual(values = paletteer_d("dutchmasters::view_of_Delft", 7)) +
                 theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
                 xlab("") +
                 theme(legend.position = "none")
-
-
             pdf(paste(outputdir, "genes", paste0(gene, ".pdf"), sep = "/"), width = 4, height = 4)
             print(p_no_title)
             dev.off()
             # add to plot list
             plots <- c(plots, list(p_no_title))
+            
+            ### log plots
+            p_log <- counts %>% ggplot() +
+                geom_col(data = gd, aes(x = factor(condition, level = levels), y = .data[[gene]], fill = factor(condition, level = levels)), color = "black") +
+                geom_point(aes(x = factor(condition, level = levels), y = .data[[gene]]), position = position_dodge2(width = 0.2)) +
+                theme_cowplot() +
+                theme(aspect.ratio=1) +
+                scale_y_continuous(trans='log10') +
+                scale_fill_manual(values = paletteer_d("dutchmasters::view_of_Delft", 7)) +
+                theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+                xlab("") +
+                theme(legend.position = "none")
+            pdf(paste(outputdir, "genes", paste0(gene,"log", ".pdf"), sep = "/"), width = 4, height = 4)
+            print(p_no_title)
+            dev.off()
+            plotslog <- c(plotslog, list(p_log))
         }
     }
 
     grid <- plot_grid(plotlist = plots, labels = "AUTO", ncol = 4)
     title <- ggdraw() + draw_label(genelistname, fontface = "bold", size = 25)
     gridT <- plot_grid(title, grid, ncol = 1, rel_heights = c(0.1, 1)) # rel_heights values control title margins
-    height <- (ceiling(length(plots_fewer_cat) / 4) * 4) * 1.1
+    height <- (ceiling(length(plots_fewer_cat) / 4) * 4)
     pdf(paste(outputdir, "genes", paste0("list", genelistname, ".pdf"), sep = "/"), width = 13, height = height)
     print(gridT)
     dev.off()
@@ -293,7 +309,7 @@ for (genelistname in names(genelists)[1]) {
 
 
         plots_fewer_cat <- list()
-        for (gene in genelists[[genelistname]]) {
+        for (gene in genelists[[genelistname]][1:16]) {
             if (gene %in% colnames(counts)) {
                 # first create a grouped summary for the bar plot
                 gd <- counts %>%
@@ -308,6 +324,7 @@ for (genelistname in names(genelists)[1]) {
                     geom_col(data = gd, aes(x = factor(condition, level = levels), y = .data[[gene]], fill = factor(condition, level = levels)), color = "black") +
                     geom_point(aes(x = factor(condition, level = levels), y = .data[[gene]]), position = position_dodge2(width = 0.2)) +
                     theme_cowplot() +
+                    theme(aspect.ratio=1) +
                     scale_fill_manual(values = paletteer_d("ggsci::default_aaas", 2)) +
                     annotate("text", label = sig, x = 1.5, y = Inf, hjust = 0.5, vjust = 1, size = 10) +
                     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
@@ -322,8 +339,8 @@ for (genelistname in names(genelists)[1]) {
         grid <- plot_grid(plotlist = plots_fewer_cat, labels = "AUTO", ncol = 4)
         title <- ggdraw() + draw_label(genelistname, fontface = "bold", size = 25)
         gridT <- plot_grid(title, grid, ncol = 1, rel_heights = c(0.1, 1)) # rel_heights values control title margins
-        height <- (ceiling(length(plots_fewer_cat) / 4) * 4) * 1.1
-        pdf(paste(outputdir, contrast, "genes", paste0(genelistname, ".pdf"), sep = "/"), width = 13, height = height)
+        height <- (ceiling(length(plots_fewer_cat) / 4) * 4)
+        pdf(paste(outputdir, contrast, "genes", paste0("list", genelistname, ".pdf"), sep = "/"), width = 13, height = height)
         print(gridT)
         dev.off()
     }
@@ -331,3 +348,7 @@ for (genelistname in names(genelists)[1]) {
 
 x <- data.frame()
 write.table(x, file = snakemake@output[["outfile"]], col.names = FALSE)
+
+
+
+########### experimental

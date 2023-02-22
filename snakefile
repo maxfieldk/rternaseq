@@ -824,13 +824,10 @@ rule repeatanalysis:
         activeelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/activeelementContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisactiveelementContrastplot.rst", category="repeat analysis"),
         familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/FamilyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
         combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/CombinedContrastPlot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
-        sharedamongallcontrasts_derte = "results/agg/repeatanalysis/sharedamongallcontrasts_derte.tsv",
         DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
-        "scripts/saveimage.R"
-
-
+        "scripts/repeatanalysis.R"
 
 rule ideogram:
     input:
@@ -874,6 +871,8 @@ rule getDEelementMSA:
 
     shell:
         """
+if [ -s {input} ]
+then
 bedtools getfasta -s -fullHeader -fi {params.hs1fa} -bed {input} -fo {output.fa}
 cat {params.consensus} > {output.faWithConsensus}
 echo >> {output.faWithConsensus}
@@ -883,9 +882,22 @@ echo >> {output.faWithConsensusAndOutgroup}
 cat {params.outgroup} >> {output.faWithConsensusAndOutgroup}
 echo >> {output.faWithConsensusAndOutgroup}
 cat {output.fa} >> {output.faWithConsensusAndOutgroup}
+if [ $(grep ">" {output.fa} | wc -l) -gt 1 ]
+then
 mafft --auto {output.fa} > {output.aln}
+else
+touch {output.aln}
+fi
 mafft --auto {output.faWithConsensus} > {output.alnWithConsensus}
 mafft --auto {output.faWithConsensusAndOutgroup} > {output.alnWithConsensusAndOutgroup}
+else
+touch {output.fa}
+touch {output.faWithConsensus}
+touch {output.faWithConsensusAndOutgroup}
+touch {output.aln}
+touch {output.alnWithConsensus}
+touch {output.alnWithConsensusAndOutgroup}
+fi
         """ 
 #expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.fasta", telocaltype = telocaltypes, contrast = contrasts, RTE = "L1HS", direciton = ["UP", "DOWN"])
 
@@ -896,11 +908,10 @@ rule evoAnalysis:
         aln = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.aln"
     conda:
         "envs/evo.yml"
+    params:
+        basepath = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}"
     output:
-        alignment = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.alignment.pdf",
-        msa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.msa.pdf",
-        tree = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.tree.pdf",
-        treeMSA = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.treeMSA.pdf"
+        alignment = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.alignment.pdf"
     script:
         "scripts/evoAnalysis.R"
 

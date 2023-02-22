@@ -21,6 +21,7 @@ library("org.Hs.eg.db")
 library("ggrepel")
 save.image(file = ".repeatanalysis.RData")
 
+outputdir <- snakemake@params[["outputdir"]]
 peptable <- read.csv(snakemake@params[["peptable"]])
 # order matters for the colors!
 contrast_colors <- snakemake@params[["contrast_colors"]]
@@ -192,13 +193,9 @@ telocaltypes <- snakemake@params[["telocaltypes"]]
 lengthreq <- snakemake@params[["lengthreq"]]
 
 
-dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), intron = character(), exon = character(), region = character(), stringsAsFactors = FALSE)
+resultslist <- list()
 for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
-        outputdir <- paste(snakemake@params[["outputdir"]], telocaltype, sep = "/")
-
-        forBedUP <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
-        forBedDOWN <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
         ####### DATA WRANGLING
         contrast_level_2 <- unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
         contrast_base_level <- unlist(strsplit(contrast, "_", fixed = TRUE))[[4]]
@@ -277,8 +274,14 @@ for (telocaltype in telocaltypes) {
                 results[matches & (results[, "length"] > lengthreq[[TE]]), classification] <- TE
             }
         }
+        resultslist[[telocaltype]][[contrast]] <- results
+    }
+}
 
-        ################################################ PLOTING
+################################################ PLOTING
+for (telocaltype in telocaltypes) {
+    for (contrast in contrasts) {
+        results <- resultslist[[telocaltype]][[contrast]]
         ##### plot settings!
 
         # quanttype = "log2"
@@ -290,9 +293,6 @@ for (telocaltype in telocaltypes) {
         herv_lims <- c(-1, 11)
 
         ##### ACTIVE RTE PLOTS
-        # annotated plots
-        outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
-
         # scatter plots
         scatterplotsNoAnnotations <- list()
         classificationlevels <- c("Subfamily", "Family")
@@ -308,7 +308,7 @@ for (telocaltype in telocaltypes) {
                 print(e)
                 if (e != "Other") {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = numToSample, annotate_top = 0)
-                    dirname <- file.path(outputdir, contrast, e)
+                    dirname <- file.path(outputdir, telocaltype, contrast, e)
                     dir.create(dirname, recursive = TRUE)
                     pdf(paste(dirname, paste0(e, "NotAnnotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
@@ -332,7 +332,7 @@ for (telocaltype in telocaltypes) {
                 print(e)
                 if (e != "Other") {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = numToSample, annotate_top = 5)
-                    dirname <- file.path(outputdir, contrast, e)
+                    dirname <- file.path(outputdir, telocaltype, contrast, e)
                     dir.create(dirname, recursive = TRUE)
                     pdf(paste(dirname, paste0(e, "highlyannotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
@@ -356,7 +356,7 @@ for (telocaltype in telocaltypes) {
                 print(e)
                 if (e != "Other") {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = numToSample, annotate_top = 3)
-                    dirname <- file.path(outputdir, contrast, e)
+                    dirname <- file.path(outputdir, telocaltype, contrast, e)
                     dir.create(dirname, recursive = TRUE)
                     pdf(paste(dirname, paste0(e, "annotated", ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
@@ -371,7 +371,7 @@ for (telocaltype in telocaltypes) {
         classificationlevels <- c("Subfamily", "Family", "ActiveFamily")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel, groupByRegion = TRUE)
-            dirname <- file.path(outputdir, contrast)
+            dirname <- file.path(outputdir, telocaltype, contrast)
             dir.create(dirname, recursive = TRUE)
             pdf(paste(dirname, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
@@ -383,7 +383,7 @@ for (telocaltype in telocaltypes) {
         classificationlevels <- c("Subfamily")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel, repeattypesallowed = c("L1"), groupByRegion = TRUE)
-            dirname <- file.path(outputdir, contrast)
+            dirname <- file.path(outputdir, telocaltype, contrast)
             dir.create(dirname, recursive = TRUE)
             pdf(paste(dirname, paste0("AggL1", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
@@ -397,7 +397,7 @@ for (telocaltype in telocaltypes) {
         classificationlevels <- c("Subfamily", "Family", "ActiveFamily")
         for (classificationlevel in classificationlevels) {
             tempplot <- plotAggRTE(results, classificationlevel)
-            dirname <- file.path(outputdir, contrast)
+            dirname <- file.path(outputdir, telocaltype, contrast)
             dir.create(dirname, recursive = TRUE)
             pdf(paste(dirname, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4)
             print(tempplot)
@@ -409,7 +409,7 @@ for (telocaltype in telocaltypes) {
         ########### cow plots
         ###### First with annotations
         # Active RTE
-        legend <- get_legend(scatterplots[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
+        legend <- get_legend(scatterplots[["AluY"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
         p <- plot_grid(violinplots[["ActiveFamily"]],
             scatterplots[["L1HS"]] + theme(legend.position = "none"),
             scatterplots[["AluY"]] + theme(legend.position = "none"),
@@ -420,7 +420,7 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        dirname <- file.path(outputdir, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
         pdf(paste(dirname, paste0("activeelementContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
@@ -438,7 +438,7 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        dirname <- file.path(outputdir, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
         pdf(paste(dirname, paste0("FamilyContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
@@ -461,7 +461,7 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        dirname <- file.path(outputdir, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
         pdf(paste(dirname, paste0("CombinedContrastPlot", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
@@ -483,7 +483,7 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        dirname <- file.path(outputdir, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
         pdf(paste(dirname, paste0("CombinedContrastPlotL1", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
@@ -492,7 +492,7 @@ for (telocaltype in telocaltypes) {
 
         ############## Same together plots but without the annotations
         # Active RTE
-        legend <- get_legend(scatterplotsNoAnnotations[["L1HS"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
+        legend <- get_legend(scatterplotsNoAnnotations[["AluY"]] + theme(legend.box.margin = margin(0, 0, 0, 1)))
         p <- plot_grid(violinplots[["ActiveFamily"]],
             scatterplotsNoAnnotations[["L1HS"]] + theme(legend.position = "none"),
             scatterplotsNoAnnotations[["AluY"]] + theme(legend.position = "none"),
@@ -503,7 +503,7 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        dirname <- file.path(outputdir, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
         pdf(paste(dirname, paste0("activeelementContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
@@ -521,7 +521,7 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        dirname <- file.path(outputdir, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
         pdf(paste(dirname, paste0("FamilyContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
@@ -544,7 +544,7 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        dirname <- file.path(outputdir, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
         pdf(paste(dirname, paste0("CombinedContrastPlotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
@@ -566,13 +566,18 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, contrast, paste0("CombinedContrastPlotL1NoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
+        pdf(paste(outputdir, telocaltype, contrast, paste0("CombinedContrastPlotL1NoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
+    }
+}
 
-
-        ################################################ END#PLOTING
-        ################################################ Build dedf and beddfs
+################################################ END#PLOTING
+################################################ Build dedf and beddfs
+dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), intron = character(), exon = character(), region = character(), stringsAsFactors = FALSE)
+for (telocaltype in telocaltypes) {
+    for (contrast in contrasts) {
+        results <- resultslist[[telocaltype]][[contrast]]
         repTEs <- snakemake@params[["repeatanalysis"]]
         testosave <- repTEs[["Subfamily"]]
         dedfLvl2 <- results %>%
@@ -581,27 +586,9 @@ for (telocaltype in telocaltypes) {
             dplyr::mutate(contrast = contrast) %>%
             dplyr::mutate(telocaltype = telocaltype) %>%
             dplyr::select(c(Subfamily, teorgenename, chr, start, stop, strand, direction, contrast, telocaltype, length, intronOverlapCount, exonOverlapCount, region))
-        subfamilies <- dedfLvl2$Subfamily %>% unique()
-        for (subfamily in subfamilies) {
-            bedUP <- dedfLvl2 %>%
-                filter(direction == "UP") %>%
-                filter(Subfamily == subfamily) %>%
-                mutate(score = 1000) %>%
-                dplyr::select(c(chr, start, stop, teorgenename, score, strand))
-            bedDOWN <- dedfLvl2 %>%
-                filter(direction == "DOWN") %>%
-                filter(Subfamily == subfamily) %>%
-                mutate(score = 1000) %>%
-                dplyr::select(c(chr, start, stop, teorgenename, score, strand))
-            dirname <- file.path(outputdir, telocaltype, contrast, subfamily)
-            dir.create(dirname, recursive = TRUE)
-            write.table(bedUP, file.path(dirname, "deUP.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-            write.table(bedDOWN, file.path(dirname, "deDOWN.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
-        }
+        dedf <- rbind(dedf, dedfLvl2)
     }
-    dedf <- rbind(dedf, dedfLvl2)
 }
-
 
 ########### Are de RTEs the same?
 
@@ -610,7 +597,7 @@ for (telocaltype in telocaltypes) {
 for (telocaltype in telocaltypes) {
     newcol1 <- paste0("sharedAmongContrasts", "In", telocaltype)
     dedf[newcol1] <- "No"
-    for (direction in directions) {
+    for (direction in c("UP", "DOWN")) {
         tetypes <- dedf$Subfamily %>% unique()
         for (tetype in tetypes) {
             tempdf <- dedf %>%
@@ -636,6 +623,27 @@ for (telocaltype in telocaltypes) {
 ######## Write final dedf to file
 write.table(dedf, file = snakemake@output[["DETEsbyContrast"]], quote = FALSE, col.names = TRUE, row.names = FALSE, sep = "\t")
 
+######## Write beds to file
+forBedUP <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
+forBedDOWN <- data.frame(chr = character(), start = numeric(), stop = numeric(), te = character(), score = numeric(), strand = character(), stringsAsFactors = FALSE)
+for (telocaltype in telocaltypes) {
+    for (contrast in contrasts) {
+        subfamilies <- dedf$Subfamily %>% unique()
+        for (subfamily in subfamilies) {
+            bedUP <- dedf[dedf$telocaltype == telocaltype & dedf$contrast == contrast & dedf$direction == "UP" & dedf$Subfamily == subfamily, ] %>%
+                mutate(score = 1000) %>%
+                dplyr::select(c(chr, start, stop, teorgenename, score, strand))
+            bedDOWN <- dedf[dedf$telocaltype == telocaltype & dedf$contrast == contrast & dedf$direction == "DOWN" & dedf$Subfamily == subfamily, ] %>%
+                mutate(score = 1000) %>%
+                dplyr::select(c(chr, start, stop, teorgenename, score, strand))
+            dirname <- file.path(outputdir, telocaltype, contrast, subfamily)
+            dir.create(dirname, recursive = TRUE)
+            write.table(bedUP, file.path(dirname, "deUP.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+            write.table(bedDOWN, file.path(dirname, "deDOWN.bed"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE)
+        }
+    }
+}
+
 # Note on p-values set to NA: some values in the results table can be set to NA for one of the following reasons:
 
 # If within a row, all samples have zero counts, the baseMean column will be zero, and the log2 fold change estimates, p value and adjusted p value will all be set to NA.
@@ -645,7 +653,6 @@ write.table(dedf, file = snakemake@output[["DETEsbyContrast"]], quote = FALSE, c
 
 ################################################ Venn diagrams of non-RTEs
 for (counttype in snakemake@params[["counttypes"]]) {
-    outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
     UP <- list()
     DOWN <- list()
 
@@ -669,23 +676,21 @@ for (counttype in snakemake@params[["counttypes"]]) {
     plots <- list(upplot, downplot)
     grid <- plot_grid(plotlist = plots, labels = "AUTO", ncol = 1)
     fgrid <- plot_grid(grid, legd, nrow = 2, rel_heights = c(1, 0.2))
-    pdf(paste(outputdir, paste0("VennDiagram", "allDEGS", ".pdf"), sep = "/"), width = 4, height = 6)
+    pdf(paste(outputdir, counttype, paste0("VennDiagram", "allDEGS", ".pdf"), sep = "/"), width = 4, height = 6)
     print(fgrid)
     dev.off()
 }
 
 ################################################
-outputdir <- paste(snakemake@params[["outputdir"]], sep = "/")
-
-for (counttype in telocaltypes) {
+for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
-        df <- dedf[dedf$counttype == counttype & dedf$contrast == contrast, ]
+        df <- dedf[dedf$telocaltype == telocaltype & dedf$contrast == contrast, ]
         pl <- df %>% ggplot() +
             geom_bar(aes(x = region, fill = region)) +
             ggtitle("DE RTE") +
             theme(aspect.ratio = 1) +
             theme_cowplot()
-        dirname <- file.path(outputdir, counttype, contrast)
+        dirname <- file.path(outputdir, telocaltype, contrast)
         basename <- "derteByLocation.pdf"
         pdf(file.path(dirname, basename), width = 4, height = 3)
         print(pl)
@@ -698,7 +703,7 @@ for (counttype in telocaltypes) {
                     ggtitle(paste("DE", tetype, direction)) +
                     theme(aspect.ratio = 1) +
                     theme_cowplot()
-                dirname <- file.path(outputdir, counttype, contrast, tetype)
+                dirname <- file.path(outputdir, telocaltype, contrast, tetype)
                 dir.create(dirname, recursive = TRUE)
                 basename <- paste0("derteByLocation", tetype, direction, ".pdf")
                 pdf(file.path(dirname, basename), width = 4, height = 3)
@@ -709,163 +714,116 @@ for (counttype in telocaltypes) {
     }
 }
 
-
-
-
-
-############ Calculating significance of overalps
-master_deRTEs <- list()
-for (direction in c("UP", "DOWN")) {
-    counttype_deRTEs <- list()
-    for (counttype in snakemake@params[["telocaltypes"]]) {
-        outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
-        pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA(.){0,2}:L1", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
-        names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int", "L1PA", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
-        deRTEs <- list()
-        for (e in names(pattern)) {
-            rte <- e
-            contrastL <- list()
-            for (contrast in contrasts) {
-                df <- read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
-                colnames(df)[1] <- "Geneid"
-                matches <- grep(pattern[e], df$Geneid)
-                searched_element <- df[matches, ]
-                if (direction == "UP") {
-                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange > 0, "Geneid"] %>% na.omit())
-                } else {
-                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange < 0, "Geneid"] %>% na.omit())
-                }
-                names(sigsearched) <- gsub("condition_", "", contrast)
-                contrastL <- c(contrastL, sigsearched)
-            }
-            deRTEs[[e]] <- contrastL
-        }
-        counttype_deRTEs[[counttype]] <- deRTEs
-    }
-    master_deRTEs[[direction]] <- counttype_deRTEs
-}
-
-head(dedf)
-
-## For stats purposes
-telocalcountsample1 <- read.csv(snakemake@input[["telocal"]][[1]])
-# telocalcountsample1 =read.delim("/users/mkelsey/data/marco/outs/SRR6515349/TElocal/SRR6515349_uniq.cntTable", sep = "\t")
-allgenes <- telocalcountsample1[[1]]
-pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA(.){0,2}:L1", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
-names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int", "L1PA", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
-
-numberOfInstances <- list()
-for (e in names(pattern)) {
-    rte <- e
-    matches <- grep(pattern[e], allgenes)
-    numberOfInstances[e] <- length(matches)
-}
-
-sigdf <- data.frame(counttype = character(), element = character(), sig = numeric(), universe = character(), direction = character())
-i <- 1
-
-for (direction in c("UP", "DOWN")) {
-    for (telocaltype in telocaltypes) {
-        for (e in names(pattern)) {
-            ntotal <- unname(unlist(numberOfInstances[e]))
-            contrast_lengths <- c()
-            for (thing in master_deRTEs[[direction]][[telocaltype]][[e]]) {
-                contrast_lengths <- c(contrast_lengths, length(thing))
-            }
-            overlap <- length(shared_des_master[[direction]][[telocaltype]][[e]])
-            if (length(contrasts) == 2) {
-                significance <- phyper(overlap - 1, contrast_lengths[2], ntotal - contrast_lengths[2], contrast_lengths[1], lower.tail = FALSE)
-            } else {
-                significance <- 75
-            }
-
-            vec <- list(telocaltype, e, significance, ntotal, direction)
-            sigdf[i, ] <- vec
-            i <- i + 1
-        }
-    }
-}
-sigdf <- sigdf %>% mutate(sigcode = ifelse(sig == 75, " ", ifelse(sig > 0.05, "NS", ifelse(sig > 0.01, "*", ifelse(sig > 0.001, "**", "***")))))
-
-
 ###########################
 for (direction in c("UP", "DOWN")) {
-    for (counttype in snakemake@params[["telocaltypes"]]) {
-        outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
-        pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA(.){0,2}:L1", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
-        names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int", "L1PA", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
+    for (telocaltype in snakemake@params[["telocaltypes"]]) {
         plots <- list()
-        for (e in names(pattern)) {
-            rte <- e
-            contrastL <- list()
-            for (contrast in contrasts) {
-                df <- read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
-                colnames(df)[1] <- "Geneid"
-                matches <- grep(pattern[e], df$Geneid)
-                searched_element <- df[matches, ]
-                if (direction == "UP") {
-                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange > 0, "Geneid"] %>% na.omit())
-                } else {
-                    sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange < 0, "Geneid"] %>% na.omit())
+        for (classification in names(repTEs)) {
+            for (TE in names(repTEs[[classification]])) {
+                contrastL <- list()
+                for (contrast in contrasts) {
+                    if (direction == "UP") {
+                        sigsearched <- resultslist[[telocaltype]][[contrast]][resultslist[[telocaltype]][[contrast]][, classification] == TE, ] %>%
+                            filter(padj < 0.05) %>%
+                            filter(log2FoldChange > 0) %>%
+                            dplyr::select(Geneid) %>%
+                            na.omit() %>%
+                            list()
+                    } else {
+                        sigsearched <- resultslist[[telocaltype]][[contrast]][resultslist[[telocaltype]][[contrast]][, classification] == TE, ] %>%
+                            filter(padj < 0.05) %>%
+                            filter(log2FoldChange < 0) %>%
+                            dplyr::select(Geneid) %>%
+                            na.omit() %>%
+                            list()
+                    }
+                    names(sigsearched) <- gsub("condition_", "", contrast)
+                    contrastL <- c(contrastL, sigsearched)
                 }
-                names(sigsearched) <- gsub("condition_", "", contrast)
-                contrastL <- c(contrastL, sigsearched)
+                universe <- sum(resultslist[[telocaltype]][[contrast]][, classification] == TE, na.rm = TRUE)
+                fit <- euler(contrastL, shape = "ellipse")
+                p <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors, main = paste(TE, direction, sep = " "), legendcex = 1)
+                pl <- ggdraw(p) +
+                    annotate("text", label = paste0("Total: ", my_comma(universe)), x = Inf, y = Inf, vjust = 1, hjust = 1, size = 4)
+                dirname <- file.path(outputdir, telocaltype, TE)
+                dir.create(dirname, recursive = TRUE)
+                pdf(paste(dirname, paste0("VennDiagram", TE, direction, ".pdf"), sep = "/"), width = 4, height = 4)
+                print(pl)
+                dev.off()
+                p_no_title <- euPlot(fit, contrasts, main = TE, fill = contrast_colors, legend = FALSE)
+                plnotitle <- ggdraw(p_no_title) +
+                    annotate("text", label = paste0("Total: ", my_comma(universe)), x = Inf, y = Inf, vjust = 1, hjust = 1, size = 4)
+                plots[[e]] <- plnotitle
             }
-            fit <- euler(contrastL, shape = "ellipse")
-            p <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors, main = paste(rte, direction, sep = " "), legendcex = 1)
-            sigcode <- sigdf[sigdf$counttype == counttype & sigdf$element == e & sigdf$direction == direction, ]$sigcode
-            if (sigcode == "NS") {
-                size <- 4
-            } else {
-                size <- 15
-            }
-            universe <- sigdf[sigdf$counttype == counttype & sigdf$element == e & sigdf$direction == direction, ]$universe
-            pl <- ggdraw(p) +
-                annotate("text", label = sigcode, x = Inf, y = Inf, vjust = 1, hjust = 1, size = size) +
-                annotate("text", label = paste0("\nU: ", my_comma(universe)), x = Inf, y = Inf, vjust = 1, hjust = 1, size = 4)
-            dirname <- file.path(outputdir, counttype, tetype)
+
+            grid <- plot_grid(plotlist = plots[1:6], ncol = 3)
+            legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
+            title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
+            fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 1, 0.2))
+            dirname <- file.path(outputdir, telocaltype)
             dir.create(dirname, recursive = TRUE)
-            pdf(paste(dirname, paste0("VennDiagram", rte, direction, ".pdf"), sep = "/"), width = 4, height = 4)
-            print(pl)
+            pdf(paste(dirname, paste0("VennDiagram", "RTEs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
+            print(fgrid)
             dev.off()
-            p_no_title <- euPlot(fit, contrasts, main = rte, fill = contrast_colors, legend = FALSE)
-            plnotitle <- ggdraw(p_no_title) +
-                annotate("text", label = sigcode, x = Inf, y = Inf, vjust = 1, hjust = 1, size = size) +
-                annotate("text", label = paste0("\nU: ", my_comma(universe)), x = Inf, y = Inf, vjust = 1, hjust = 1, size = 4)
-            plots[[e]] <- plnotitle
+
+            grid <- plot_grid(plotlist = plots[7:12], ncol = 3)
+            legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
+            title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
+            fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 1, 0.2))
+            dirname <- file.path(outputdir, telocaltype)
+            dir.create(dirname, recursive = TRUE)
+            pdf(paste(dirname, paste0("VennDiagram", "L1PAs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
+            print(fgrid)
+            dev.off()
+
+            grid <- plot_grid(plotlist = plots[1:12], ncol = 3)
+            legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
+            title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
+            fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 2, 0.2))
+            dirname <- file.path(outputdir, telocaltype)
+            dir.create(dirname, recursive = TRUE)
+            pdf(paste(dirname, paste0("VennDiagram", "AllRTEs", direction, ".pdf"), sep = "/"), width = 9, height = 12)
+            print(fgrid)
+            dev.off()
         }
-
-        grid <- plot_grid(plotlist = plots[1:6], ncol = 3)
-        legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
-        title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
-        fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 1, 0.2))
-        dirname <- file.path(outputdir, counttype)
-        dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("VennDiagram", "RTEs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
-        print(fgrid)
-        dev.off()
-
-        grid <- plot_grid(plotlist = plots[7:12], ncol = 3)
-        legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
-        title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
-        fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 1, 0.2))
-        dirname <- file.path(outputdir)
-        dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("VennDiagram", "L1PAs", direction, ".pdf"), sep = "/"), width = 9, height = 6)
-        print(fgrid)
-        dev.off()
-
-        grid <- plot_grid(plotlist = plots[1:12], ncol = 3)
-        legd <- makeLegendGrob(gsub("condition_", "", contrasts), fill = contrast_colors)
-        title <- ggdraw() + draw_label(paste("DE", direction, sep = " "), fontface = "bold", size = 20)
-        fgrid <- plot_grid(title, grid, legd, nrow = 3, rel_heights = c(0.15, 2, 0.2))
-        dirname <- file.path(outputdir)
-        dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("VennDiagram", "AllRTEs", direction, ".pdf"), sep = "/"), width = 9, height = 12)
-        print(fgrid)
-        dev.off()
     }
 }
+
+
+#################### RTE in genome histograms
+# colors <- c("deeppink4", "deepskyblue4", "darkorange4", "deeppink1", "deepskyblue1", "darkorange1")
+plots <- list()
+for (classification in names(repTEs)) {
+    for (TE in names(repTEs[[classification]])) {
+        print(classification)
+        print(TE)
+        subdf <- results[results[, classification] == TE, ]
+        counts <- length(rownames(subdf))
+        p <- subdf %>% ggplot() +
+            geom_histogram(aes(x = length)) +
+            ggtitle(TE) +
+            theme_cowplot() +
+            theme(aspect.ratio = 1) +
+            labs(x = "length", y = "counts") +
+            scale_y_continuous(labels = function(x) my_comma(x)) +
+            annotate("text", x = 0, y = Inf, hjust = 0, vjust = 1, label = paste("Total:", my_comma(counts)))
+        pdf(paste(outputdir, paste0("histogram", TE, ".pdf"), sep = "/"), width = 4, height = 4)
+        print(p)
+        dev.off()
+        plots[[TE]] <- p
+    }
+}
+
+grid <- plot_grid(plotlist = plots, labels = "AUTO")
+pdf(paste(outputdir, paste0("histogram", "allRTEs", ".pdf"), sep = "/"), width = 12, height = 9)
+print(grid)
+dev.off()
+
+##############
+
+x <- data.frame()
+write.table(x, file = snakemake@output[["outfile"]], col.names = FALSE)
+save.image()
 
 
 ################# write table for DEs shared amongst all constrasts
@@ -897,61 +855,82 @@ for (direction in c("UP", "DOWN")) {
 # }
 # write.table(dedf, file = snakemake@output[["sharedamongallcontrasts_derte"]], quote = FALSE, col.names = FALSE, row.names = FALSE, sep = "\t")
 
-#################### RTE in genome histograms
-outputdir <- snakemake@params[["outputdir"]]
-repeats <- snakemake@params[["repeats"]]
-repmasker <- read_delim(repeats, col_names = FALSE) %>%
-    mutate_at(c("X2", "X3"), as.numeric) %>%
-    mutate(length = X3 - X2)
 
 
-pattern <- c("LINE/L1", "SINE/Alu", "LTR/ERVK", "L1HS", "AluY", "HERVK(.)*int")
-names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int")
-activeLengthReq <- c(1, 0, 0, 6000, 290, 7000)
-maxlength <- c(7000, 400, 17400, 7000, 400, 17400)
-colors <- c("deeppink4", "deepskyblue4", "darkorange4", "deeppink1", "deepskyblue1", "darkorange1")
+# ############ Calculating significance of overalps
+# master_deRTEs <- list()
+# for (direction in c("UP", "DOWN")) {
+#     counttype_deRTEs <- list()
+#     for (counttype in snakemake@params[["telocaltypes"]]) {
+#         outputdir <- paste(snakemake@params[["outputdir"]], counttype, sep = "/")
+#         pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA(.){0,2}:L1", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
+#         names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int", "L1PA", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
+#         deRTEs <- list()
+#         for (e in names(pattern)) {
+#             rte <- e
+#             contrastL <- list()
+#             for (contrast in contrasts) {
+#                 df <- read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
+#                 colnames(df)[1] <- "Geneid"
+#                 matches <- grep(pattern[e], df$Geneid)
+#                 searched_element <- df[matches, ]
+#                 if (direction == "UP") {
+#                     sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange > 0, "Geneid"] %>% na.omit())
+#                 } else {
+#                     sigsearched <- list(searched_element[searched_element$padj < 0.05 & searched_element$log2FoldChange < 0, "Geneid"] %>% na.omit())
+#                 }
+#                 names(sigsearched) <- gsub("condition_", "", contrast)
+#                 contrastL <- c(contrastL, sigsearched)
+#             }
+#             deRTEs[[e]] <- contrastL
+#         }
+#         counttype_deRTEs[[counttype]] <- deRTEs
+#     }
+#     master_deRTEs[[direction]] <- counttype_deRTEs
+# }
 
-# pattern = "LINE"
-# tempdf = repmasker %>% filter(grepl(pattern, X4))
-# counts = length(rownames(tempdf))
-# ggplot(tempdf) + geom_histogram(aes(x = length)) + annotate("text", x=Inf, y = Inf, vjust=1, hjust=1, label = paste("Total:", counts))
+# head(dedf)
 
+# ## For stats purposes
+# telocalcountsample1 <- read.csv(snakemake@input[["telocal"]][[1]])
+# # telocalcountsample1 =read.delim("/users/mkelsey/data/marco/outs/SRR6515349/TElocal/SRR6515349_uniq.cntTable", sep = "\t")
+# allgenes <- telocalcountsample1[[1]]
+# pattern <- list("L1:LINE", "Alu:SINE", "ERVK:LTR", "L1HS:L1", "AluY:Alu", "HERVK(.)*int", "L1PA(.){0,2}:L1", "L1PA2:L1", "L1PA3:L1", "L1PA4:L1", "L1PA5:L1", "L1PA[6789]{1}:L1")
+# names(pattern) <- c("L1", "Alu", "ERVK", "L1HS", "AluY", "HERVK-int", "L1PA", "L1PA2", "L1PA3", "L1PA4", "L1PA5", "L1PA6-9")
 
-plots <- list()
-for (i in seq(length(pattern))) {
-    print(i)
-    print(pattern[i])
-    tempdf <- repmasker %>%
-        filter(length < maxlength[i]) %>%
-        filter(grepl(pattern[i], X4))
-    counts <- length(rownames(tempdf))
-    p <- tempdf %>% ggplot() +
-        geom_histogram(aes(x = length), fill = colors[i]) +
-        ggtitle(names(pattern)[i]) +
-        theme_cowplot() +
-        labs(x = "length", y = "counts") +
-        scale_y_continuous(labels = function(x) my_comma(x)) +
-        annotate("text", x = 0, y = Inf, hjust = 0, vjust = 1, label = paste("Total:", my_comma(counts)))
-    pdf(paste(outputdir, paste0("histogram", names(pattern)[i], ".pdf"), sep = "/"), width = 4, height = 4)
-    print(p)
-    dev.off()
-    plots <- c(plots, list(p))
-}
+# numberOfInstances <- list()
+# for (e in names(pattern)) {
+#     rte <- e
+#     matches <- grep(pattern[e], allgenes)
+#     numberOfInstances[e] <- length(matches)
+# }
 
-grid <- plot_grid(plotlist = plots, labels = "AUTO")
-pdf(paste(outputdir, paste0("histogram", "allRTEs", ".pdf"), sep = "/"), width = 10, height = 6)
-print(grid)
-dev.off()
+# sigdf <- data.frame(counttype = character(), element = character(), sig = numeric(), universe = character(), direction = character())
+# i <- 1
 
-##############
+# for (direction in c("UP", "DOWN")) {
+#     for (telocaltype in telocaltypes) {
+#         for (e in names(pattern)) {
+#             ntotal <- unname(unlist(numberOfInstances[e]))
+#             contrast_lengths <- c()
+#             for (thing in master_deRTEs[[direction]][[telocaltype]][[e]]) {
+#                 contrast_lengths <- c(contrast_lengths, length(thing))
+#             }
+#             overlap <- length(shared_des_master[[direction]][[telocaltype]][[e]])
+#             if (length(contrasts) == 2) {
+#                 significance <- phyper(overlap - 1, contrast_lengths[2], ntotal - contrast_lengths[2], contrast_lengths[1], lower.tail = FALSE)
+#             } else {
+#                 significance <- 75
+#             }
 
-x <- data.frame()
-write.table(x, file = snakemake@output[["outfile"]], col.names = FALSE)
-save.image()
-#############
+#             vec <- list(telocaltype, e, significance, ntotal, direction)
+#             sigdf[i, ] <- vec
+#             i <- i + 1
+#         }
+#     }
+# }
+# sigdf <- sigdf %>% mutate(sigcode = ifelse(sig == 75, " ", ifelse(sig > 0.05, "NS", ifelse(sig > 0.01, "*", ifelse(sig > 0.001, "**", "***")))))
 
-
-mapper <- read.delim(snakemake@params[["telocalmapping"]], sep = "\t", header = FALSE)
 # #### functions
 # getPos <- function(rte, tab) {
 #     rterow <- mapper %>%
