@@ -19,3 +19,6 @@ dependencies:
  - bioconductor-GenomicFeatures
  - bioconductor-PCAtools
  - bioconductor-limma
+ - r-tidyr
+ - r-ggally
+ - r-paletteer

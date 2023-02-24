@@ -37,6 +37,32 @@ telocaltypes = config["telocaltypes"]
 contrasts = config["contrasts"]
 counttypes = config["counttypes"]
 directions = ["UP", "DOWN"]
+def exHelper(path):
+    try:
+        files = expand(path, telocaltype = telocaltypes, contrast = contrasts, rte = ["L1HS", "AluY", "HERVK-int"], direction = ["UP", "DOWN"])
+        return files
+    except:
+        None
+    try:
+        files = expand(path, telocaltype = telocaltypes, contrast = contrasts, direction = ["UP", "DOWN"])
+        return files
+    except:
+        None
+    try:
+        files = expand(path, telocaltype = telocaltypes, contrast = contrasts, direction = ["UP", "DOWN"])
+        return files
+    except:
+        None
+    try:
+        files = expand(path, telocaltype = telocaltypes, contrast = contrasts)
+        return files
+    except:
+        None
+    try:
+        files = expand(path, telocaltype = telocaltypes)
+        return files
+    except:
+        None
 
 # tips:
 # build needed directories in python! Will save you much frustration :)
@@ -56,7 +82,8 @@ except:
 
 rule all:
     input:
-        expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.alignment.pdf", telocaltype = telocaltypes, contrast = contrasts, rte = ["L1HS", "AluY", "HERVK-int"], direction = ["UP", "DOWN"])
+        exHelper("results/agg/repeatanalysis/variance/{telocaltype}/{contrast}/corrplot1.pdf")[1]
+        # expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.alignment.pdf", telocaltype = telocaltypes, contrast = contrasts, rte = ["L1HS", "AluY", "HERVK-int"], direction = ["UP", "DOWN"])
         
 ########################################################### Make folders
 if True:
@@ -825,9 +852,28 @@ rule repeatanalysis:
         familyContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/FamilyContrastplot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysisfamilyContrastplot.rst", category="repeat analysis"),
         combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/CombinedContrastPlot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
         DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
+        resultsdf = "results/agg/repeatanalysis/resultsdf.tsv",
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
         "scripts/repeatanalysis.R"
+
+rule repeatVariance:
+    input: 
+        resultsdf = "results/agg/repeatanalysis/resultsdf.tsv"
+    params:
+        repeatanalysis = config["repeatanalysis"],
+        contrasts = config["contrasts"],
+        counttypes = config["counttypes"],
+        telocaltypes = config["telocaltypes"],
+        levelslegendmap = config["levelslegendmap"],
+        lengthreq = config["lengthreq"],
+        peptable = "conf/private/peptable.csv"
+    output:
+        corrplot1 = "results/agg/repeatanalysis/variance/{telocaltype}/{contrast}/corrplot1.pdf",
+        corrplot2 = "results/agg/repeatanalysis/variance/{telocaltype}/{contrast}/corrplot2.pdf",
+        corrplotcontrast = "results/agg/repeatanalysis/variance/{telocaltype}/{contrast}/corrplot{contrast}.pdf"
+    notebook:
+        "scripts/rteVariance.ipynb"
 
 rule ideogram:
     input:

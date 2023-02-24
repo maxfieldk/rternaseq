@@ -3,22 +3,21 @@
 log <- file(snakemake@log[[1]], open = "wt")
 sink(log)
 
-library("readr")
-library("stringr")
-library("dplyr")
+
 library("ggplot2")
-library("tibble")
 library("RColorBrewer")
 library("magrittr")
 library("cowplot")
 library("eulerr")
 library("ggVennDiagram")
-library("Gviz")
-library("GenomicRanges")
-library("rtracklayer")
-library("trackViewer")
 library("org.Hs.eg.db")
 library("ggrepel")
+library("readr")
+library("stringr")
+library("dplyr")
+library("tibble")
+library("tidyr")
+
 save.image(file = ".repeatanalysis.RData")
 
 outputdir <- snakemake@params[["outputdir"]]
@@ -38,18 +37,19 @@ my_comma <- function(num) {
 plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", colors = c("< 0.001" = "red", "< 0.05" = "#b300ff", "> 0.05" = "grey"), alpha = 0.9, number_to_sample = NULL, annotate_top = 0) {
     dat <- df %>% filter(.data[[classificationlevel]] == rte)
     if (is.null(number_to_sample)) {
-        arranged <- dat %>% arrange(padj)
+        arranged <- dat %>% arrange((!!sym(paste0("padj_", contrast))))
         arranged$rank <- row.names(arranged)
         arranged$rank <- as.integer(arranged$rank)
         arranged <- arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
         rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
-            geom_point(aes(color = Significance, shape = region2)) +
+            geom_point(aes(color = (!!sym(paste0("Significance_", contrast))), shape = region2)) +
             geom_abline(intercept = 0) +
             coord_fixed() +
             xlim(lims) +
             ylim(lims) +
-            scale_color_manual(values = colors) +
-            scale_shape_manual(name = "Genomic\nContext", values = c("Genic" = 19, "Non-Genic" = 17)) +
+            scale_color_manual(name = "Significance", values = colors) +
+            labs(color = "Significance", shape = "Genomic\nContext") +
+            scale_shape_manual(values = c("Genic" = 19, "Non-Genic" = 17)) +
             theme_cowplot() +
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
@@ -70,18 +70,19 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
     } else {
         number_to_sample <- min(length(rownames(dat)), number_to_sample)
         datasampled <- dat[sample(rownames(dat), number_to_sample, replace = FALSE), ]
-        arranged <- datasampled %>% arrange(padj)
+        arranged <- datasampled %>% arrange((!!sym(paste0("padj_", contrast))))
         arranged$rank <- row.names(arranged)
         arranged$rank <- as.integer(arranged$rank)
         arranged <- arranged %>% mutate(labelshow = ifelse(rank <= annotate_top, "yes", "no"))
         rteplot <- arranged %>% ggplot(aes(x = .data[[xval]], y = .data[[yval]])) +
-            geom_point(aes(color = Significance, shape = region2)) +
+            geom_point(aes(color = (!!sym(paste0("Significance_", contrast))), shape = region2)) +
             geom_abline(intercept = 0) +
             coord_fixed() +
             xlim(lims) +
             ylim(lims) +
-            scale_color_manual(values = colors) +
-            scale_shape_manual(name = "Genomic\nContext", values = c("Genic" = 19, "Non-Genic" = 17)) +
+            scale_color_manual(name = "Significance", values = colors) +
+            labs(color = "Significance", shape = "Genomic\nContext") +
+            scale_shape_manual(values = c("Genic" = 19, "Non-Genic" = 17)) +
             theme_cowplot() +
             ggtitle(title) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
@@ -102,7 +103,7 @@ plotRTE <- function(rte, classificationlevel, df, lims = c(-1, 11), title = "", 
     }
 }
 
-plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, groupByRegion = TRUE, valuescol = "log2FoldChange") {
+plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, groupByRegion = TRUE, valuescol = paste0("log2FoldChange_", contrast)) {
     if (is.null(repeattypesallowed)) {
         df <- df %>%
             filter(.data[[classificationlevel]] != "Other")
@@ -119,6 +120,7 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, group
             ggtitle("RTEs") +
             coord_fixed() +
             ylim(c(-11, 11)) +
+            labs(x = "", y = "log2 Fold Change") +
             theme_cowplot() +
             theme(legend.position = c(0.05, 0.18)) +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
@@ -133,6 +135,7 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, group
             ggtitle("RTEs") +
             coord_fixed() +
             ylim(c(-11, 11)) +
+            labs(x = "", y = "log2 Fold Change") +
             theme_cowplot() +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
             theme(axis.line = element_blank()) +
@@ -193,95 +196,108 @@ telocaltypes <- snakemake@params[["telocaltypes"]]
 lengthreq <- snakemake@params[["lengthreq"]]
 
 
-resultslist <- list()
+
+#build dds frames 
+RESLIST = list()
 for (telocaltype in telocaltypes) {
+    contrastl = list()
     for (contrast in contrasts) {
-        ####### DATA WRANGLING
-        contrast_level_2 <- unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
-        contrast_base_level <- unlist(strsplit(contrast, "_", fixed = TRUE))[[4]]
-        conditions <- c(contrast_base_level, contrast_level_2)
+        ddsres <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "results.csv", sep = "/"))
+        ddsresmod <- ddsres %>%
+        dplyr::rename(Geneid = ...1) %>%
+        mutate(Significance = ifelse(padj < 0.05, ifelse(padj < 0.001, "< 0.001", "< 0.05"), "> 0.05")) %>%
+        dplyr::select(c(Geneid, log2FoldChange, padj, Significance)) %>%
+        dplyr::rename(!!paste0("log2FoldChange_",contrast) := log2FoldChange) %>%
+        dplyr::rename(!!paste0("padj_",contrast) := padj) %>%
+        dplyr::rename(!!paste0("Significance_",contrast) := Significance)
+        contrastl[[contrast]] <- ddsresmod
+    }
+    ddsrestetype = Reduce(function(x, y) merge(x,y,by = "Geneid"), contrastl, accumulate = FALSE )
+    ddsrestetype = ddsrestetype %>% mutate(tlt = telocaltype)
+    RESLIST[[telocaltype]] <-ddsrestetype
+}
+ddsfinal = bind_rows(RESLIST)
 
-        ddsres <- read.csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "results.csv", sep = "/"))
-        ddscounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "counttablesizenormed.csv", sep = "/"))
-        ddsrlogcounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "rlogcounts.csv", sep = "/"))
-
-
-        colnames(ddsres)[1] <- "Geneid"
-        colnames(ddscounts)[1] <- "Geneid"
-        colnames(ddsrlogcounts)[1] <- "Geneid"
-
-        avoidzero <- 1
-        meancols <- c()
-        log2meancols <- c()
-        rlogmeancols <- c()
-
-        for (condition in conditions) {
-            condition_samples <- filter(peptable, condition == {{ condition }})$sample_name
-            s <- ""
-            for (e in condition_samples) {
-                if (s == "") {
-                    s <- paste0("`", e, "`")
-                } else {
-                    s <- paste0(s, "+", "`", e, "`")
-                }
-            }
-            s <- paste0("(", s, ")", "/", length(condition_samples))
-            meancol <- paste0(condition, "mean")
-            ddscounts <- ddscounts %>% mutate({{ meancol }} := eval(parse(text = s)))
-            rlogmeancol <- paste0("rlog", condition, "mean")
-            ddsrlogcounts <- ddsrlogcounts %>% mutate({{ rlogmeancol }} := eval(parse(text = s)))
-            log2meancol <- paste0("log2", condition, "mean")
-            ddscounts <- ddscounts %>% mutate({{ log2meancol }} := log2(.data[[meancol]]))
-            meancols <- c(meancols, meancol)
-            log2meancols <- c(log2meancols, log2meancol)
-            rlogmeancols <- c(rlogmeancols, rlogmeancol)
-        }
-
-        columns_to_retain <- c("Geneid", meancols, log2meancols)
-        rlogcolumns_to_retain <- c("Geneid", rlogmeancols)
-
-        log2sub <- ddscounts[, columns_to_retain]
-        rlogsub <- ddsrlogcounts[, rlogcolumns_to_retain]
-
-        dflist <- list(ddsres, log2sub, rlogsub)
-
-        results <- Reduce(function(x, y) merge(x, y, by = "Geneid"), dflist, accumulate = FALSE)
-        results <- results %>% mutate(Significance = ifelse(padj < 0.05, ifelse(padj < 0.001, "< 0.001", "< 0.05"), "> 0.05"))
-        results <- results %>% mutate(teorgenename = str_split(Geneid, ":", simplify = TRUE)[, 1])
-        colnames(telocalrepeatsannotated) <- c("chr", "start", "stop", "teorgenename", "ignore", "strand", "intronOverlapCount", "exonOverlapCount", "region")
-        results <- left_join(
-            results,
-            telocalrepeatsannotated,
-            by = "teorgenename",
-            copy = FALSE,
-            suffix = c(".x", ".y"),
-            keep = NULL,
-            na_matches = c("na", "never"),
-            multiple = "any",
-            unmatched = "drop"
-        )
-        results <- results %>% mutate(region2 = ifelse(region == "exon" | region == "intron", "Genic", "Non-Genic"))
-        results <- results %>% mutate(length = stop - start)
-        genes <- results$Geneid
-
-
-        repTEs <- snakemake@params[["repeatanalysis"]]
-        for (classification in names(repTEs)) {
-            results[classification] <- "Other"
-            for (TE in names(repTEs[[classification]])) {
-                pattern <- repTEs[[classification]][[TE]]
-                matches <- grepl(pattern, genes)
-                results[matches & (results[, "length"] > lengthreq[[TE]]), classification] <- TE
+#build counts frames (all normed count tables should be the same for all contrast in a given counttype)
+COUNTLIST = list()
+for (telocaltype in telocaltypes) {
+    conditions = peptable$condition %>% unique()
+    ddscounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "counttablesizenormed.csv", sep = "/"))
+    ddsrlogcounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "rlogcounts.csv", sep = "/"))
+    colnames(ddscounts)[1] <- "Geneid"
+    colnames(ddsrlogcounts)[1] <- "Geneid"
+    avoidzero <- 1
+    meancols <- c()
+    log2meancols <- c()
+    rlogmeancols <- c()
+    for (condition in conditions) {
+        condition_samples <- filter(peptable, condition == {{ condition }})$sample_name
+        s <- ""
+        for (e in condition_samples) {
+            if (s == "") {
+                s <- paste0("`", e, "`")
+            } else {
+                s <- paste0(s, "+", "`", e, "`")
             }
         }
-        resultslist[[telocaltype]][[contrast]] <- results
+        s <- paste0("(", s, ")", "/", length(condition_samples))
+        meancol <- paste0(condition, "mean")
+        ddscounts <- ddscounts %>% mutate({{ meancol }} := eval(parse(text = s)))
+        rlogmeancol <- paste0("rlog", condition, "mean")
+        ddsrlogcounts <- ddsrlogcounts %>% mutate({{ rlogmeancol }} := eval(parse(text = s)))
+        log2meancol <- paste0("log2", condition, "mean")
+        ddscounts <- ddscounts %>% mutate({{ log2meancol }} := log2(.data[[meancol]] + avoidzero))
+        meancols <- c(meancols, meancol)
+        log2meancols <- c(log2meancols, log2meancol)
+        rlogmeancols <- c(rlogmeancols, rlogmeancol)
+    }
+    rlogcolumns_to_retain <- c("Geneid", rlogmeancols)
+    log2sub <- ddscounts
+    rlogsub <- ddsrlogcounts[, rlogcolumns_to_retain]
+    log2sub = log2sub %>% mutate(tlt = telocaltype)
+    countres = merge(log2sub,rlogsub,by = "Geneid")
+    COUNTLIST[[telocaltype]] <-countres
+}
+countsfinal = bind_rows(COUNTLIST)
+
+#merge counts and dds, then add TE annotations
+resultsdf <- merge(ddsfinal, countsfinal, by = c("Geneid", "tlt")) %>%
+        mutate(teorgenename = str_split(Geneid, ":", simplify = TRUE)[, 1])
+
+colnames(telocalrepeatsannotated) <- c("chr", "start", "stop", "teorgenename", "ignore", "strand", "intronOverlapCount", "exonOverlapCount", "region")
+resultsdf <- left_join(
+    resultsdf,
+    telocalrepeatsannotated,
+    by = "teorgenename",
+    copy = FALSE,
+    suffix = c(".x", ".y"),
+    keep = NULL,
+    na_matches = c("na", "never"),
+    multiple = "any",
+    unmatched = "drop") %>%
+        mutate(region2 = ifelse(region == "exon" | region == "intron", "Genic", "Non-Genic")) %>%
+        mutate(length = stop - start)
+genes <- resultsdf$Geneid
+
+repTEs <- snakemake@params[["repeatanalysis"]]
+for (classification in names(repTEs)) {
+    resultsdf[classification] <- "Other"
+    for (TE in names(repTEs[[classification]])) {
+        pattern <- repTEs[[classification]][[TE]]
+        matches <- grepl(pattern, genes)
+        resultsdf[matches & (resultsdf[, "length"] > lengthreq[[TE]]), classification] <- TE
     }
 }
+write_tsv(resultsdf, snakemake@output[["resultsdf"]])
 
+###DONT USE COLUMN NAMES IN FILTER CALLS!!! It will eval variables as columns ...
 ################################################ PLOTING
 for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
-        results <- resultslist[[telocaltype]][[contrast]]
+        #results <- resultslist[[telocaltype]][[contrast]]
+        results <- resultsdf %>% dplyr::filter(tlt == telocaltype)
+        contrast_level_2 <- unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
+        contrast_base_level <- unlist(strsplit(contrast, "_", fixed = TRUE))[[4]]
         ##### plot settings!
 
         # quanttype = "log2"
@@ -577,19 +593,20 @@ for (telocaltype in telocaltypes) {
 dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), contrast = character(), counttype = character(), length = numeric(), intron = character(), exon = character(), region = character(), stringsAsFactors = FALSE)
 for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
-        results <- resultslist[[telocaltype]][[contrast]]
+        results <- resultsdf %>% dplyr::filter(tlt == telocaltype)
         repTEs <- snakemake@params[["repeatanalysis"]]
         testosave <- repTEs[["Subfamily"]]
         dedfLvl2 <- results %>%
-            filter(padj < 0.05 & Subfamily %in% names(testosave)) %>%
-            dplyr::mutate(direction = ifelse(log2FoldChange > 0, "UP", "DOWN")) %>%
+            dplyr::filter( (!!sym(paste0("padj_", contrast))) < 0.05) %>%
+            dplyr::filter(Subfamily %in% names(testosave)) %>%
+            dplyr::mutate(direction = ifelse( (!!sym(paste0("log2FoldChange_", contrast))) > 0, "UP", "DOWN")) %>%
             dplyr::mutate(contrast = contrast) %>%
-            dplyr::mutate(telocaltype = telocaltype) %>%
-            dplyr::select(c(Subfamily, teorgenename, chr, start, stop, strand, direction, contrast, telocaltype, length, intronOverlapCount, exonOverlapCount, region))
+            dplyr::mutate(counttype = telocaltype) %>%
+            dplyr::select(c(Subfamily, teorgenename, chr, start, stop, strand, direction, contrast, counttype, length, intronOverlapCount, exonOverlapCount, region))
         dedf <- rbind(dedf, dedfLvl2)
     }
 }
-
+dedf = dedf %>% dplyr::distinct()
 ########### Are de RTEs the same?
 
 # this will be: for each counttype, what RTEs were DE in all contrasts
@@ -601,7 +618,7 @@ for (telocaltype in telocaltypes) {
         tetypes <- dedf$Subfamily %>% unique()
         for (tetype in tetypes) {
             tempdf <- dedf %>%
-                filter(telocaltype == telocaltype & direction == direction & Subfamily == tetype) %>%
+                filter(counttype == telocaltype & direction == direction & Subfamily == tetype) %>%
                 dplyr::select(teorgenename)
             ecounts <- table(tempdf)
             sharedContrast <- names(ecounts[ecounts > 1])
@@ -630,10 +647,10 @@ for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
         subfamilies <- dedf$Subfamily %>% unique()
         for (subfamily in subfamilies) {
-            bedUP <- dedf[dedf$telocaltype == telocaltype & dedf$contrast == contrast & dedf$direction == "UP" & dedf$Subfamily == subfamily, ] %>%
+            bedUP <- dedf[dedf$counttype == telocaltype & dedf$contrast == contrast & dedf$direction == "UP" & dedf$Subfamily == subfamily, ] %>%
                 mutate(score = 1000) %>%
                 dplyr::select(c(chr, start, stop, teorgenename, score, strand))
-            bedDOWN <- dedf[dedf$telocaltype == telocaltype & dedf$contrast == contrast & dedf$direction == "DOWN" & dedf$Subfamily == subfamily, ] %>%
+            bedDOWN <- dedf[dedf$counttype == telocaltype & dedf$contrast == contrast & dedf$direction == "DOWN" & dedf$Subfamily == subfamily, ] %>%
                 mutate(score = 1000) %>%
                 dplyr::select(c(chr, start, stop, teorgenename, score, strand))
             dirname <- file.path(outputdir, telocaltype, contrast, subfamily)
@@ -643,7 +660,6 @@ for (telocaltype in telocaltypes) {
         }
     }
 }
-
 # Note on p-values set to NA: some values in the results table can be set to NA for one of the following reasons:
 
 # If within a row, all samples have zero counts, the baseMean column will be zero, and the log2 fold change estimates, p value and adjusted p value will all be set to NA.
@@ -661,8 +677,15 @@ for (counttype in snakemake@params[["counttypes"]]) {
     for (contrast in contrasts) {
         df <- read.csv(paste(snakemake@params[["inputdir"]], counttype, contrast, "results.csv", sep = "/"))
         colnames(df)[1] <- "Geneid"
-        dfUP <- df[df$pvalue < 0.05 & df$log2FoldChange > 0, "Geneid"] %>% na.omit()
-        dfDOWN <- df[df$pvalue < 0.05 & df$log2FoldChange < 0, "Geneid"] %>% na.omit()
+        dfUP <- df %>%
+            dplyr::filter(padj < 0.05) %>%
+            dplyr::filter(log2FoldChange > 0) %>%
+            na.omit()
+        dfDOWN <- df %>%
+            dplyr::filter(padj < 0.05) %>%
+            dplyr::filter(log2FoldChange < 0) %>%
+            na.omit()
+
         UP[[gsub("condition_", "", contrast)]] <- dfUP
         DOWN[[gsub("condition_", "", contrast)]] <- dfDOWN
     }
@@ -684,7 +707,7 @@ for (counttype in snakemake@params[["counttypes"]]) {
 ################################################
 for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
-        df <- dedf[dedf$telocaltype == telocaltype & dedf$contrast == contrast, ]
+        df <- dedf[dedf$counttype == telocaltype & dedf$contrast == contrast, ]
         pl <- df %>% ggplot() +
             geom_bar(aes(x = region, fill = region)) +
             ggtitle("DE RTE") +
@@ -717,30 +740,35 @@ for (telocaltype in telocaltypes) {
 ###########################
 for (direction in c("UP", "DOWN")) {
     for (telocaltype in snakemake@params[["telocaltypes"]]) {
+        results <- resultsdf %>% filter(tlt == telocaltype)
         plots <- list()
         for (classification in names(repTEs)) {
             for (TE in names(repTEs[[classification]])) {
                 contrastL <- list()
                 for (contrast in contrasts) {
                     if (direction == "UP") {
-                        sigsearched <- resultslist[[telocaltype]][[contrast]][resultslist[[telocaltype]][[contrast]][, classification] == TE, ] %>%
-                            filter(padj < 0.05) %>%
-                            filter(log2FoldChange > 0) %>%
+                        sigsearched <- results %>%
+                            dplyr::filter((!!sym(classification)) == TE) %>%
+                            dplyr::filter((!!sym(paste0("padj_", contrast))) < 0.05) %>%
+                            dplyr::filter((!!sym(paste0("log2FoldChange_", contrast))) > 0) %>%
                             dplyr::select(Geneid) %>%
-                            na.omit() %>%
+                            na.omit() %$%
+                            unlist(Geneid) %>%
                             list()
                     } else {
-                        sigsearched <- resultslist[[telocaltype]][[contrast]][resultslist[[telocaltype]][[contrast]][, classification] == TE, ] %>%
-                            filter(padj < 0.05) %>%
-                            filter(log2FoldChange < 0) %>%
+                        sigsearched <- results %>%
+                            dplyr::filter((!!sym(classification)) == TE) %>%
+                            dplyr::filter((!!sym(paste0("padj_", contrast))) < 0.05) %>%
+                            dplyr::filter((!!sym(paste0("log2FoldChange_", contrast))) < 0) %>%
                             dplyr::select(Geneid) %>%
-                            na.omit() %>%
+                            na.omit() %$%
+                            unlist(Geneid) %>%                            
                             list()
                     }
                     names(sigsearched) <- gsub("condition_", "", contrast)
                     contrastL <- c(contrastL, sigsearched)
                 }
-                universe <- sum(resultslist[[telocaltype]][[contrast]][, classification] == TE, na.rm = TRUE)
+                universe <- results %>% dplyr::filter((!!sym(classification)) == TE)  %$% length(Geneid)
                 fit <- euler(contrastL, shape = "ellipse")
                 p <- euPlot(fit, gsub("condition_", "", contrasts), fill = contrast_colors, main = paste(TE, direction, sep = " "), legendcex = 1)
                 pl <- ggdraw(p) +
@@ -797,7 +825,8 @@ for (classification in names(repTEs)) {
     for (TE in names(repTEs[[classification]])) {
         print(classification)
         print(TE)
-        subdf <- results[results[, classification] == TE, ]
+        subdf <- resultsdf %>% dplyr::filter( (!!sym(classification)) == TE) %>%
+            dplyr::filter(tlt == "telocal_uniq")
         counts <- length(rownames(subdf))
         p <- subdf %>% ggplot() +
             geom_histogram(aes(x = length)) +
@@ -825,7 +854,7 @@ x <- data.frame()
 write.table(x, file = snakemake@output[["outfile"]], col.names = FALSE)
 save.image()
 
-
+################################DO CORR PLOTS!!!
 ################# write table for DEs shared amongst all constrasts
 
 # dedf <- data.frame(tetype = character(), te = character(), chr = character(), start = numeric(), stop = numeric(), strand = character(), direction = character(), length = numeric(), stringsAsFactors = FALSE)
@@ -948,3 +977,93 @@ save.image()
 #         )
 #     return(list(chr = rterow$chr, start = as.numeric(rterow$start), stop = as.numeric(rterow$stop), strand = rterow$strand, intron = as.numeric(rterow$intron), exon = as.numeric(rterow$exon)))
 # }
+
+
+# resultslist <- list()
+# for (telocaltype in telocaltypes) {
+#     for (contrast in contrasts) {
+#         ####### DATA WRANGLING
+#         contrast_level_2 <- unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
+#         contrast_base_level <- unlist(strsplit(contrast, "_", fixed = TRUE))[[4]]
+#         liveconditions <- c(contrast_base_level, contrast_level_2)
+#         conditions = peptable$condition %>% unique()
+
+#         ddsres <- read.csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "results.csv", sep = "/"))
+#         ddscounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "counttablesizenormed.csv", sep = "/"))
+#         ddsrlogcounts <- read_csv(paste(snakemake@params[["inputdir"]], telocaltype, contrast, "rlogcounts.csv", sep = "/"))
+
+
+#         colnames(ddsres)[1] <- "Geneid"
+#         colnames(ddscounts)[1] <- "Geneid"
+#         colnames(ddsrlogcounts)[1] <- "Geneid"
+
+#         avoidzero <- 1
+#         meancols <- c()
+#         log2meancols <- c()
+#         rlogmeancols <- c()
+
+
+
+#         for (condition in conditions) {
+#             condition_samples <- filter(peptable, condition == {{ condition }})$sample_name
+#             s <- ""
+#             for (e in condition_samples) {
+#                 if (s == "") {
+#                     s <- paste0("`", e, "`")
+#                 } else {
+#                     s <- paste0(s, "+", "`", e, "`")
+#                 }
+#             }
+#             s <- paste0("(", s, ")", "/", length(condition_samples))
+#             meancol <- paste0(condition, "mean")
+#             ddscounts <- ddscounts %>% mutate({{ meancol }} := eval(parse(text = s)))
+#             rlogmeancol <- paste0("rlog", condition, "mean")
+#             ddsrlogcounts <- ddsrlogcounts %>% mutate({{ rlogmeancol }} := eval(parse(text = s)))
+#             log2meancol <- paste0("log2", condition, "mean")
+#             ddscounts <- ddscounts %>% mutate({{ log2meancol }} := log2(.data[[meancol]]))
+#             meancols <- c(meancols, meancol)
+#             log2meancols <- c(log2meancols, log2meancol)
+#             rlogmeancols <- c(rlogmeancols, rlogmeancol)
+#         }
+
+#         rlogcolumns_to_retain <- c("Geneid", rlogmeancols)
+
+#         log2sub <- ddscounts
+#         rlogsub <- ddsrlogcounts[, rlogcolumns_to_retain]
+
+#         dflist <- list(ddsres, log2sub, rlogsub)
+
+#         results <- Reduce(function(x, y) merge(x, y, by = "Geneid"), dflist, accumulate = FALSE)
+#         results <- results %>% mutate(Significance = ifelse(padj < 0.05, ifelse(padj < 0.001, "< 0.001", "< 0.05"), "> 0.05"))
+#         results <- results %>% mutate(teorgenename = str_split(Geneid, ":", simplify = TRUE)[, 1])
+#         colnames(telocalrepeatsannotated) <- c("chr", "start", "stop", "teorgenename", "ignore", "strand", "intronOverlapCount", "exonOverlapCount", "region")
+#         results <- left_join(
+#             results,
+#             telocalrepeatsannotated,
+#             by = "teorgenename",
+#             copy = FALSE,
+#             suffix = c(".x", ".y"),
+#             keep = NULL,
+#             na_matches = c("na", "never"),
+#             multiple = "any",
+#             unmatched = "drop"
+#         )
+#         results <- results %>% mutate(region2 = ifelse(region == "exon" | region == "intron", "Genic", "Non-Genic"))
+#         results <- results %>% mutate(length = stop - start)
+#         genes <- results$Geneid
+
+
+#         repTEs <- snakemake@params[["repeatanalysis"]]
+#         for (classification in names(repTEs)) {
+#             results[classification] <- "Other"
+#             for (TE in names(repTEs[[classification]])) {
+#                 pattern <- repTEs[[classification]][[TE]]
+#                 matches <- grepl(pattern, genes)
+#                 results[matches & (results[, "length"] > lengthreq[[TE]]), classification] <- TE
+#             }
+#         }
+#         resultslist[[telocaltype]][[contrast]] <- results
+#     }
+# }
+
+# results %>% head()
