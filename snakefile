@@ -26,6 +26,8 @@ configfile: "conf/private/configPrivate.yaml"
 configfile: "conf/shared/configShared.yaml"
 pepfile: "conf/private/project_config.yaml"
 
+
+
 container: "docker://maxfieldkelsey/snakesenescence:latest"
 
 samples = pep.sample_table.sample_name
@@ -257,7 +259,7 @@ rule prefetch:
         sra = temp("rawdata/{sample}/{sample}.sra")
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell: "prefetch {wildcards.sample} --output-directory rawdata"
 
 rule fastqdump:
@@ -270,7 +272,7 @@ rule fastqdump:
         r1 = temp("rawdata/{sample}_1.fastq"),
         r2 = temp("rawdata/{sample}_2.fastq")
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell: "fastq-dump --split-files --outdir {params.outdir} {input} 2> {log}"
 
         
@@ -290,7 +292,7 @@ rule fastqdump:
 #         utr1 = "rawdata/{sample}_1.trimmed.fastq.unpaired.gz",
 #         utr2 = "rawdata/{sample}_2.trimmed.fastq.unpaired.gz"
 #     conda:
-#         "envs/deeptools.yml"
+#         "deeptools"
 #     shell:
 #         """
 # java -jar {params.trimmomaticdir}/trimmomatic-0.39.jar \
@@ -319,7 +321,7 @@ rule fastp:
         json = "outs/{sample}/trimmedReads/fastp.json",
         html = "outs/{sample}/trimmedReads/fastp.html"
     conda:
-        "envs/qc.yml"
+        "qc"
     shell:
         """
 fastp -i {input.r1} -I {input.r2} -o {output.r1} -O {output.r2} --json {output.json} --html {output.html} --detect_adapter_for_pe --thread {threads}
@@ -340,7 +342,7 @@ rule AlignBowtie2:
         err = "logs/{sample}/bowtie2.err"
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         "bowtie2 -x {params.index} -1 {input.r1} -2 {input.r2} -S {output.sam} --threads {threads} > {log.out} 2> {log.err}"
 
@@ -351,7 +353,7 @@ rule samtobam:
         bam = temp("outs/{sample}/{sample}.bam")
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         "samtools view -S -b {input.sam} > {output.bam}"
 
@@ -362,7 +364,7 @@ rule sortbams:
         sortedbam = "outs/{sample}/{sample}.sorted.bam"
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell: "samtools sort {input.bam} -o {output.sortedbam}"
 
 rule indexsortedbam:
@@ -373,7 +375,7 @@ rule indexsortedbam:
         bamindex = "outs/{sample}/{sample}.sorted.bam.bai"
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell: "samtools index {input.sortedbam} 2> {log}"
 
 rule bamstats:
@@ -383,7 +385,7 @@ rule bamstats:
         bamstats = "outs/{sample}/{sample}.bam.sorted.stats.txt"
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         "samtools stats {input.bam} > {output.bamstats}"
 
@@ -406,7 +408,7 @@ rule alignSTAR:
     resources:
         mem_mb  = 60000
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         """
 STAR --genomeDir {params.index} --readFilesCommand zcat --readFilesIn {input.r1} {input.r2} --outFileNamePrefix {params.outdir} --runThreadN {threads} --winAnchorMultimapNmax 100 --outFilterMultimapNmax 100 > {log.out} 2> {log.err}
@@ -420,7 +422,7 @@ rule sortSTARbams:
     log: "logs/{sample}/sortSTARbams.log"
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell: "samtools sort {input.bamSTAR} -o {output.sortedbamSTAR} 2> {log}"
 
 rule indexsortedSTARbam:
@@ -431,7 +433,7 @@ rule indexsortedSTARbam:
         sortedbamSTARindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell: "samtools index {input.sortedbamSTAR} 2> {log}"
 
 
@@ -448,7 +450,7 @@ rule repeatCounts:
         repeatcounts = "outs/{sample}/{sample}.repeatmasker.counts"
     threads: 4
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         "bedtools coverage -counts -F 0.5 -sorted -b {input.bam} -a {input.repeats} > {output.repeatcounts} 2> {log}"
 
@@ -471,7 +473,7 @@ rule getnormalizedCounts:
         repeatcounts = "results/{sample}/{sample}.repeatmasker.countsPerMillionNonMito"
     log: "logs/{sample}/getnormalizedCounts.log"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         """
         awk -v milnonmito=$(cat {input.mnma}) -F "\t" '{{print $0 "\t" $NF/milnonmito}}' {input.repeatcounts} > {output.repeatcounts} 2> {log}
@@ -490,7 +492,7 @@ rule getnormalizedFamilyCounts:
         hervk = "results/{sample}/{sample}.hervk.counts.txt",
         sva = "results/{sample}/{sample}.sva.counts.txt"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         """
         awk -F "\t" '/LINE\/L1/ {{sum+=$NF}} END {{print sum}}' {input.counts} > {output.l1}
@@ -510,7 +512,7 @@ rule multiBamSummary:
     threads: 4
     log: "logs/multiBamSummary.log"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell: "multiBamSummary bins --numberOfProcessors {threads} --bamfiles {input.bam} -o {output.agg} 2> {log}"
 
 rule plotbamPCA:
@@ -520,7 +522,7 @@ rule plotbamPCA:
         plot = report("results/agg/plots/PCA_readCounts.png", caption = "report/plotbamPCA.rst", category="PCA")
     log: "logs/agg/plotbamPCA.log"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     shell:
         "plotPCA -in {input.agg} -o {output.plot} -T 'PCA of read counts' 2> {log}"
 
@@ -563,7 +565,7 @@ rule featureCounts:
         featureCountsstrandparam = config['featureCountsstrandparam']
     log: "logs/agg/featureCounts.log"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     threads: 4
     shell: 
         """
@@ -582,7 +584,7 @@ rule deeptools_coverage:
         bam = "outs/{sample}/star_output/{sample}.STAR.sorted.bam",
         bamindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     output:
         coverage = "outs/{sample}/{sample}_cov.bw"
     shell: "bamCoverage -b {input.bam} -o {output.coverage} --outFileFormat bigwig"
@@ -596,7 +598,7 @@ rule deeptools_plotcoverage:
         l1hs6kb = config["l1hs6kb"],
         l1hs6kbintact = config["l1hs6kbintact"],
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     output:
         genomecoverageplot = "results/{sample}/plots/coverageGenome.pdf",
         l1hscoverageplot = "results/{sample}/plots/coverageL1HS.pdf",
@@ -636,7 +638,7 @@ rule deeptools_plotAggcoverage:
         l1hs6kb = config["l1hs6kb"],
         l1hs6kbintact = config["l1hs6kbintact"]
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     log: "logs/{sample}/deeptools_plotAggcoverage.log"
     output:
         matrix = "outs/{sample}/matrix_l1hs6kb_coverage.tab.gz",
@@ -739,7 +741,7 @@ rule mergeTElocal:
         telocal = expand("outs/{sample}/TElocal/{sample}_{{maptype}}.cntTable", sample = samples)
     params:
         sample_table = config["sample_table"]
-    conda: "envs/renv.yml"
+    conda: "renv"
     log: "logs/agg/mergeTElocal_{maptype}.log"
     output:
         aggcounts = "outs/agg/TElocalCounts_{maptype}.txt",
@@ -758,7 +760,7 @@ rule DEseq2:
         counttypes = config["counttypes"],
         levels = config["levels"],
         outputdir = "results/agg/deseq2"
-    conda: "envs/renv.yml"
+    conda: "renv"
     log: "logs/agg/DEseq2.log"
     output:
         results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
@@ -779,7 +781,7 @@ rule clusterprofiler:
         levels = config["levels"],
         outputdir = "results/agg/clusterprofiler"
     conda:
-        "envs/Rclusterprofiler.yml"
+        "Rclusterprofiler"
     log:
         "logs/agg/clusterprofiler.log"
     output:
@@ -820,7 +822,7 @@ rule gvizreduxParallel:
     output:
         outfile = "temp/outfile{telocaltype}{contrast}{rtekind}{range}._{telocaltype}._{contrast}._{rtekind}._{range}.gviz.txt"
     conda:
-        "envs/repeatanalysis.yml"
+        "repeatanalysis"
     script:
         "scripts/gviz.R"
 
@@ -844,7 +846,7 @@ rule repeatanalysis:
         inputdir = "results/agg/deseq2",
         outputdir = "results/agg/repeatanalysis"
     conda:
-        "envs/repeatanalysis.yml"
+        "repeatanalysis"
     log:
         "logs/agg/repeatanalysis.log"
     output:
@@ -856,6 +858,17 @@ rule repeatanalysis:
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
         "scripts/repeatanalysis.R"
+
+
+rule testconda:
+    conda:
+        "repeatanalysis"
+    output:
+        condatest = "condatest.txt"
+    shell:
+        """
+conda env list
+        """ 
 
 rule repeatVariance:
     input: 
@@ -889,7 +902,7 @@ rule ideogram:
         namedmarkerlist = config["namedmarkerlist"],
         outputdir = "results/agg/repeatanalysis"
     conda:
-        "envs/repeatanalysis.yml"
+        "repeatanalysis"
     log:
         "logs/agg/ideogram.log"
     output:
@@ -906,7 +919,7 @@ rule getDEelementMSA:
         hs1fa = config["hs1sorted"],
         outgroup = "/users/mkelsey/data/ref/sequences/{rte}outgroup.fa"
     conda:
-        "envs/evo.yml"
+        "evo"
     output:
         fa = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.fasta",
         faWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.withconsensus.fasta",
@@ -953,7 +966,7 @@ rule evoAnalysis:
         alnWithConsensus = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.WithConsensus.aln",
         aln = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}.aln"
     conda:
-        "envs/evo.yml"
+        "evo"
     params:
         basepath = "results/agg/repeatanalysis/{telocaltype}/{contrast}/{RTE}/de{direction}"
     output:
@@ -973,7 +986,7 @@ rule deeptools_plotAggSignal:
         outputdirprofile = "results/agg/repeatanalysis",
         outputdirmatrix = "outs/agg"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     log: "logs/agg/deeptools_plotAggSignal.log"
     output:
         matrixl1hs = "outs/agg/matrix_l1hs6kb_coverage.tab.gz",
@@ -1109,7 +1122,7 @@ rule INTEGRATEfeatureCounts:
         gtf = config['refseq']
     log: "logs/agg/featureCounts.log"
     conda:
-        "envs/deeptools.yml"
+        "deeptools"
     threads: 2
     shell: 
         """
@@ -1126,7 +1139,7 @@ rule INTEGRATEmergeTElocal:
     params:
         sample_table = config["sample_table"],
         telocaltypes = config["telocaltypes"]
-    conda: "envs/renv.yml"
+    conda: "renv"
     log: "logs/agg/INTEGRATEmergeTElocal.log"
     output:
         telocal_multi = "outs/agg/INTEGRATE_TElocalCounts_multi.txt",
@@ -1146,7 +1159,7 @@ rule INTEGRATEDEseq2:
         counttypes = config["counttypes"],
         levels = config["levels"],
         outputdir = "results/agg/deseq2"
-    conda: "envs/renv.yml"
+    conda: "renv"
     log: "logs/agg/DEseq2.log"
     output:
         results = expand("results/agg/deseq2/{counttype}/{contrast}/{resulttype}.csv", counttype = config["counttypes"], contrast = config["contrasts"], resulttype = ["results", "counttablesizenormed", "rlogcounts"]),
@@ -1162,7 +1175,7 @@ rule INTEGRATEdetermineSharedDeTes:
         outputdir = "results/agg/deseq2",
         telocaltypes = config["telocaltypes"],
         contraststocompare = ["condition_SEN_vs_PRO", "condition_LSEN_vs_PRO"]
-    conda: "envs/repeatanalysis.yml"
+    conda: "repeatanalysis"
     output:
         outfile = "outfile_sharedetes.txt"
     script:
@@ -1186,7 +1199,7 @@ rule INTEGRATErepeatanalysis:
         inputdir = "results/agg/deseq2",
         outputdir = "results/agg/repeatanalysis"
     conda:
-        "envs/repeatanalysis.yml"
+        "repeatanalysis"
     log:
         "logs/agg/repeatanalysis.log"
     output:

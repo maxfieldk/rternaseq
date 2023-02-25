@@ -99,18 +99,18 @@ repeatanalysis:
     'Alu': 'Alu:SINE'
     'ERVK': 'ERVK:LTR'
   'ActiveFamily':
-    'L1HS': 'L1HS:L1'
-    'AluY': 'AluY:Alu'
+    'L1HS': 'L1HS'
+    'AluY': 'AluY'
     'HERVK-int': 'HERVK(.)*int'
   'Subfamily':
-    'L1HS': 'L1HS:L1'
-    'AluY': 'AluY:Alu'
+    'L1HS': 'L1HS'
+    'AluY': 'AluY'
     'HERVK-int': 'HERVK(.)*int'
-    'L1PA2': 'L1PA2:L1'
-    'L1PA3': 'L1PA3:L1'
-    'L1PA4': 'L1PA4:L1'
-    'L1PA5': 'L1PA5:L1'
-    'L1PA6-9': 'L1PA[6789]{1}:L1'
+    'L1PA2': 'L1PA2'
+    'L1PA3': 'L1PA3'
+    'L1PA4': 'L1PA4'
+    'L1PA5': 'L1PA5'
+    'L1PA6-9': 'L1PA[6789]{1}'
 
 genedensity:
   L1HS: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.L1HS.density.bed4"
@@ -125,3 +125,23 @@ HERVK-intconsensus: "/users/mkelsey/data/ref/sequences/HERVK-intconsensus.fa"
 L1HSoutgroup: "/users/mkelsey/data/ref/sequences/L1HSconsensus.fa"
 AluYoutgroup: "/users/mkelsey/data/ref/sequences/AluJbconsensus.fa"
 HERVK-intoutgroup: "/users/mkelsey/data/ref/sequences/HERVL-intconsensus.fa"
+
+
+# repeatanalysis:
+#   'Family':
+#     'L1': 'L1:LINE'
+#     'Alu': 'Alu:SINE'
+#     'ERVK': 'ERVK:LTR'
+#   'ActiveFamily':
+#     'L1HS': 'L1HS:L1'
+#     'AluY': 'AluY:Alu'
+#     'HERVK-int': 'HERVK(.)*int'
+#   'Subfamily':
+#     'L1HS': 'L1HS:L1'
+#     'AluY': 'AluY:Alu'
+#     'HERVK-int': 'HERVK(.)*int'
+#     'L1PA2': 'L1PA2:L1'
+#     'L1PA3': 'L1PA3:L1'
+#     'L1PA4': 'L1PA4:L1'
+#     'L1PA5': 'L1PA5:L1'
+#     'L1PA6-9': 'L1PA[6789]{1}:L1'
