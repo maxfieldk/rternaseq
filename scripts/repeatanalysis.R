@@ -19,6 +19,12 @@ library("dplyr")
 library("tibble")
 library("tidyr")
 
+tryCatch(
+    load(".repeatanalysis.RData")
+, error = function(e) {
+    print("No previous RData file found")
+})
+
 save.image(file = ".repeatanalysis.RData")
 
 outputdir <- snakemake@params[["outputdir"]]
@@ -137,6 +143,110 @@ plotAggRTE <- function(df, classificationlevel, repeattypesallowed = NULL, group
             coord_fixed() +
             ylim(c(-11, 11)) +
             labs(x = "", y = "log2 Fold Change") +
+            theme_cowplot() +
+            panel_border(color = "black", linetype = 1, remove = FALSE) +
+            theme(axis.line = element_blank()) +
+            theme(aspect.ratio = 1)
+    }
+    numberxaxis <- df[, classificationlevel] %>%
+        unique() %>%
+        length()
+    if (numberxaxis > 3) {
+        agg <- agg + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+    }
+
+    return(agg)
+}
+
+#need to input tidied data such that I have counts for each condition and condition is a column
+
+    tidydf = resultsdf %>% 
+    filter(tlt == "telocal_uniq") %>%
+    filter(Subfamily != "Other") %>%
+    select(c(21:29, 60, 64)) %>% 
+    pivot_longer(cols = -c("Subfamily", "region2")) %>%
+    mutate(condition = str_sub(name, end=-2))
+
+
+
+tidydf %>% filter(Subfamily == "HERVK-int") %>%
+    group_by(Subfamily, condition) %>%
+    summarize(mean = mean(value), sd = sd(value), sum = sum(value), n = n(), max = max(value), min = min(value))
+tidydf$condition <- factor(tidydf$condition, levels = c("PRO", "NT", "QUI"))
+
+
+
+
+for (telocaltype in telocaltypes) {
+
+    tidydf = resultsdf %>% 
+    filter(tlt == telocaltype) %>%
+    filter(Subfamily != "Other") %>%
+    select(c(21:29, 60, 64)) %>% 
+    pivot_longer(cols = -c("Subfamily", "region2")) %>%
+    mutate(condition = str_sub(name, end=-2))
+    tidydf$condition <- factor(tidydf$condition, levels = c("PRO", "NT", "QUI"))
+
+
+    for (stat in c("mean", "sum")) {
+        p = tidydf %>% 
+            filter(Subfamily != "Other") %>%
+            group_by(Subfamily, condition, region2) %>%
+            summarize(mean = mean(value), sd = sd(value), sum = sum(value), n = n(), max = max(value), min = min(value)) %>%
+            ggplot(aes(x = region2, y = .data[[stat]], fill = condition)) +
+            geom_col(position="dodge") +
+            facet_wrap(~Subfamily)
+        dirname <- file.path(outputdir, telocaltype)
+        dir.create(dirname, recursive = TRUE)
+        pdf(file.path(dirname, paste0("RTEcounts", stat, ".pdf")), width = 10, height = 5)
+        print(p)
+        dev.off()
+    }
+}
+
+plotdf = tidydf %>% 
+    filter(Subfamily == "L1HS") %>%
+    group_by(Subfamily, condition, region2) %>%
+    summarize(mean = mean(value), sd = sd(value), sum = sum(value), n = n(), max = max(value), min = min(value))
+stat = "sum"
+p = plotdf %>% ggplot(aes(x = Subfamily, y = .data[[stat]], fill = interaction(condition, region2))) +
+    geom_col(position="dodge")
+
+pdf(paste0("RTEcounts", stat, ".pdf"), width = 10, height = 5)
+print(p)
+dev.off()
+
+# pdf(paste(dirname, paste0(e, "NotAnnotated",quanttype, ".pdf"), sep = "/"), width = 5, height = 4)
+
+
+
+
+plotAggRTECounts <- function(df, classificationlevel, repeattypesallowed = NULL, groupByRegion = TRUE, valuescol = paste0("log2FoldChange_", contrast)) {
+    if (is.null(repeattypesallowed)) {
+        df <- df %>%
+            filter(.data[[classificationlevel]] != "Other")
+    } else {
+        df <- df %>%
+            filter(.data[["Family"]] %in% repeattypesallowed)
+    }
+    if (groupByRegion) {
+        agg <- df %>%
+            ggplot(aes(fill = region2, x = .data[[classificationlevel]], y = .data[[valuescol]])) +
+            geom_bar(stat = "summary", fun.y = "mean" position="dodge") +
+            ggtitle("RTEs") +
+            coord_fixed() +
+            labs(x = "", y = "Mean Counts Per element") +
+            theme_cowplot() +
+            panel_border(color = "black", linetype = 1, remove = FALSE) +
+            theme(axis.line = element_blank()) +
+            theme(aspect.ratio = 1)
+    } else {
+        agg <- df %>%
+            ggplot(aes(x = .data[[classificationlevel]], y = .data[[valuescol]])) +
+            geom_bar(stat = "summary", fun.y = "mean" position="dodge") +
+            ggtitle("RTEs") +
+            coord_fixed() +
+            labs(x = "", y = "Mean Counts Per element") +
             theme_cowplot() +
             panel_border(color = "black", linetype = 1, remove = FALSE) +
             theme(axis.line = element_blank()) +
@@ -296,20 +406,39 @@ for (classification in names(repTEs)) {
         resultsdf[matches & (resultsdf[, "length"] > lengthreq[[TE]]), classification] <- TE
     }
 }
-write_tsv(resultsdf, snakemake@output[["resultsdf"]])
 
+
+
+sigL1s = resultsdf %>%
+    filter(Subfamily == "L1HS" | Subfamily == "L1PA2") %>%
+    filter(padj_condition_SEN_vs_PRO < 0.05) %>%
+    relocate(chr, start, stop, strand, length, Family, ActiveFamily, Subfamily, region2, padj_condition_SEN_vs_PRO)
+write_tsv(sigL1s, "results/agg/repeatanalysis/sigL1s.tsv")
+
+sigHERVKs = resultsdf %>%
+    filter(str_detect(teorgenename, "HERVK")) %>%
+    filter(padj_condition_SEN_vs_PRO < 0.05) %>%
+    relocate(chr, start, stop, strand, length, Family, ActiveFamily, Subfamily, region2, padj_condition_SEN_vs_PRO)
+write_tsv(sigHERVKs, "results/agg/repeatanalysis/sigHERVKs.tsv")
+sigAluYs = resultsdf %>%
+    filter(str_detect(teorgenename, "AluY_")) %>%
+    filter(padj_condition_SEN_vs_PRO < 0.05) %>%
+    relocate(chr, start, stop, strand, length, Family, ActiveFamily, Subfamily, region2, padj_condition_SEN_vs_PRO)
+write_tsv(sigAluYs, "results/agg/repeatanalysis/sigAluYs.tsv")
+
+write_tsv(resultsdf, snakemake@output[["resultsdf"]])
+save.image(file = ".repeatanalysis.RData")
 ### DONT USE COLUMN NAMES IN FILTER CALLS!!! It will eval variables as columns ...
 ################################################ PLOTING
 for (telocaltype in telocaltypes) {
     for (contrast in contrasts) {
+    for (quanttype in c("log2", "rlog")) {
         # results <- resultslist[[telocaltype]][[contrast]]
         results <- resultsdf %>% dplyr::filter(tlt == telocaltype)
         contrast_level_2 <- unlist(strsplit(contrast, "_", fixed = TRUE))[[2]]
         contrast_base_level <- unlist(strsplit(contrast, "_", fixed = TRUE))[[4]]
         ##### plot settings!
 
-        # quanttype = "log2"
-        quanttype <- "rlog"
         xval <- paste0(quanttype, contrast_base_level, "mean")
         yval <- paste0(quanttype, contrast_level_2, "mean")
         l1_lims <- c(-1, 11)
@@ -334,7 +463,7 @@ for (telocaltype in telocaltypes) {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = numToSample, annotate_top = 0)
                     dirname <- file.path(outputdir, telocaltype, contrast, e)
                     dir.create(dirname, recursive = TRUE)
-                    pdf(paste(dirname, paste0(e, "NotAnnotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    pdf(paste(dirname, paste0(e, "NotAnnotated",quanttype, ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
                     scatterplotsNoAnnotations[[e]] <- tempplot
@@ -358,7 +487,7 @@ for (telocaltype in telocaltypes) {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = numToSample, annotate_top = 5)
                     dirname <- file.path(outputdir, telocaltype, contrast, e)
                     dir.create(dirname, recursive = TRUE)
-                    pdf(paste(dirname, paste0(e, "highlyannotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    pdf(paste(dirname, paste0(e, "highlyannotated",quanttype, ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
                     scatterplotsHighlyAnnotated[[e]] <- tempplot
@@ -382,12 +511,29 @@ for (telocaltype in telocaltypes) {
                     tempplot <- plotRTE(e, classificationlevel, results, lims = l1_lims, title = e, number_to_sample = numToSample, annotate_top = 3)
                     dirname <- file.path(outputdir, telocaltype, contrast, e)
                     dir.create(dirname, recursive = TRUE)
-                    pdf(paste(dirname, paste0(e, "annotated", ".pdf"), sep = "/"), width = 5, height = 4)
+                    pdf(paste(dirname, paste0(e, "annotated",quanttype, ".pdf"), sep = "/"), width = 5, height = 4)
                     print(tempplot)
                     dev.off()
                     scatterplots[[e]] <- tempplot
                 }
             }
+        }
+
+        # summed counts plots
+        results
+
+        countsplots <- list()
+        classificationlevels <- c("Subfamily", "Family", "ActiveFamily")
+        for (classificationlevel in classificationlevels) {
+            results %>% 
+
+            tempplot <- plotAggRTE(results, classificationlevel, groupByRegion = TRUE)
+            dirname <- file.path(outputdir, telocaltype, contrast)
+            dir.create(dirname, recursive = TRUE)
+            pdf(paste(dirname, paste0("Agg", classificationlevel, ".pdf"), sep = "/"), width = 5, height = 4) # nolint
+            print(tempplot)
+            dev.off()
+            countplots[[classificationlevel]] <- tempplot
         }
 
         # violin plots
@@ -446,7 +592,7 @@ for (telocaltype in telocaltypes) {
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("activeelementContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
+        pdf(paste(dirname, paste0("activeelementContrastplot", quanttype,".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
@@ -464,7 +610,7 @@ for (telocaltype in telocaltypes) {
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("FamilyContrastplot", ".pdf"), sep = "/"), width = 14, height = 4)
+        pdf(paste(dirname, paste0("FamilyContrastplot",quanttype, ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
@@ -487,7 +633,7 @@ for (telocaltype in telocaltypes) {
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("CombinedContrastPlot", ".pdf"), sep = "/"), width = 14, height = 8)
+        pdf(paste(dirname, paste0("CombinedContrastPlot",quanttype, ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
 
@@ -509,7 +655,7 @@ for (telocaltype in telocaltypes) {
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("CombinedContrastPlotL1", ".pdf"), sep = "/"), width = 14, height = 8)
+        pdf(paste(dirname, paste0("CombinedContrastPlotL1",quanttype, ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
 
@@ -529,7 +675,7 @@ for (telocaltype in telocaltypes) {
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("activeelementContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
+        pdf(paste(dirname, paste0("activeelementContrastplotNoAnnotations",quanttype, ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
@@ -547,7 +693,7 @@ for (telocaltype in telocaltypes) {
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("FamilyContrastplotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 4)
+        pdf(paste(dirname, paste0("FamilyContrastplotNoAnnotations",quanttype, ".pdf"), sep = "/"), width = 14, height = 4)
         print(p)
         dev.off()
 
@@ -570,7 +716,7 @@ for (telocaltype in telocaltypes) {
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
         dirname <- file.path(outputdir, telocaltype, contrast)
         dir.create(dirname, recursive = TRUE)
-        pdf(paste(dirname, paste0("CombinedContrastPlotNoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
+        pdf(paste(dirname, paste0("CombinedContrastPlotNoAnnotations",quanttype, ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
 
@@ -590,10 +736,10 @@ for (telocaltype in telocaltypes) {
             axis = "bt"
         )
         p <- plot_grid(p, legend, rel_widths = c(3, .4)) + ggtitle(paste("DE repeats", contrast, sep = " "))
-        pdf(paste(outputdir, telocaltype, contrast, paste0("CombinedContrastPlotL1NoAnnotations", ".pdf"), sep = "/"), width = 14, height = 8)
+        pdf(paste(outputdir, telocaltype, contrast, paste0("CombinedContrastPlotL1NoAnnotations",quanttype, ".pdf"), sep = "/"), width = 14, height = 8)
         print(p)
         dev.off()
-    }
+    }}
 }
 
 ################################################ END#PLOTING
@@ -861,7 +1007,6 @@ dev.off()
 
 x <- data.frame()
 write.table(x, file = snakemake@output[["outfile"]], col.names = FALSE)
-save.image()
 
 ################################ DO CORR PLOTS!!!
 ################# write table for DEs shared amongst all constrasts

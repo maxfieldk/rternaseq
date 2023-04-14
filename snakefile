@@ -1,24 +1,3 @@
-'''
-snakemake \
-    --use-conda \
-    --rerun-triggers mtime \
-    --use-singularity \
-    --singularity-args "--bind /users/mkelsey/data" \
-    --keep-going \
-    --rerun-incomplete  \
-    --latency-wait 30 \
-    --jobs 20 \
-    --default-resources mem_mb=30000 disk_mb=200000 runtime=300 \
-    --cluster '
-        sbatch \
-        -e slurm/slurm-%j.err \
-        -o slurm/slurm-%j.out \
-        --partition batch \
-        --cpus-per-task {threads} \
-        --mem {resources.mem_mb} \
-        --time 5:00:00' \
-    --dry-run
-'''
 import os
 import pandas as pd
 from pathlib import Path
@@ -31,6 +10,7 @@ pepfile: "conf/private/project_config.yaml"
 container: "docker://maxfieldkelsey/snakesenescence:latest"
 
 samples = pep.sample_table.sample_name
+samples = ["PRO1", "PRO2", "PRO3", "NT1", "NT2", "NT3"]
 peptable = pep.sample_table
 import csv
 peptable.to_csv("conf/private/peptable.csv", index = False, quoting=csv.QUOTE_NONNUMERIC)
@@ -41,7 +21,7 @@ counttypes = config["counttypes"]
 directions = ["UP", "DOWN"]
 def exHelper(path):
     try:
-        files = expand(path, telocaltype = telocaltypes, contrast = contrasts, rte = ["L1HS", "AluY", "HERVK-int"], direction = ["UP", "DOWN"])
+        files = expand(path, telocaltype = telocaltypes, contrast = contrasts, rte = ["L1HS", "AluY", "HERVK-int"], direction = ["UP", "DOWN"], sample = samples)
         return files
     except:
         None
@@ -84,7 +64,7 @@ except:
 
 rule all:
     input:
-        exHelper("results/agg/repeatanalysis/variance/{telocaltype}/{contrast}/corrplot1.pdf")[1]
+        expand("outs/{sample}/star_output/{sample}_forward_BPM_cov.bw", sample = samples)
         # expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/{rte}/de{direction}.alignment.pdf", telocaltype = telocaltypes, contrast = contrasts, rte = ["L1HS", "AluY", "HERVK-int"], direction = ["UP", "DOWN"])
         
 ########################################################### Make folders
@@ -579,15 +559,86 @@ featureCounts -p -T {threads} -B -O -a {params.gtf} -o {output.metafeaturecounts
 # deeptools plots
 #######################################################################
 
-rule deeptools_coverage:
+rule normalized_stranded_coverage:
     input:
         bam = "outs/{sample}/star_output/{sample}.STAR.sorted.bam",
         bamindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
+    params:
+        hs1size = config["hs1size"],
+        effectivegenomesize = 3117292070 #derived from using faCount from kenttools and summing all non N bases in genome
     conda:
         "deeptools"
+    resources:
+        cpus_per_task = 10
     output:
-        coverage = "outs/{sample}/{sample}_cov.bw"
-    shell: "bamCoverage -b {input.bam} -o {output.coverage} --outFileFormat bigwig"
+        bwF = "outs/{sample}/star_output/{sample}_forward_BPM_cov.bw",
+        bwR = "outs/{sample}/star_output/{sample}_reverse_BPM_cov.bw"
+    log: "logs/{sample}/normalized_stranded_coverage.log"
+    shell:
+        """
+#forward
+bamCoverage \
+-b {input.bam} \
+-o {output.bwF} \
+-of bigwig \
+--filterRNAstrand forward \
+--numberOfProcessors max \
+--normalizeUsing BPM \
+--binSize 10 \
+--effectiveGenomeSize {params.effectivegenomesize}
+
+#reverse
+bamCoverage \
+-b {input.bam} \
+-o {output.bwR} \
+-of bigwig \
+--filterRNAstrand reverse \
+--numberOfProcessors max \
+--normalizeUsing BPM \
+--binSize 10 \
+--effectiveGenomeSize {params.effectivegenomesize}
+        """
+
+
+rule bedtools_coverage_bigwig:
+    input:
+        bam = "outs/{sample}/star_output/{sample}.STAR.sorted.bam",
+        bamindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
+    params:
+        hs1size = config["hs1size"],
+    conda:
+        "omics"
+    resources:
+        cpus_per_task = 4
+    output:
+        bgnotscalled = "outs/{sample}/star_output/{sample}_notscaledcov.bg",
+        bg = "outs/{sample}/star_output/{sample}_cov.bg",
+        bw = "outs/{sample}/star_output/{sample}_cov.bw"
+    log: "logs/{sample}/deeptools_coverage_bigwig.log"
+    shell:
+        """
+millionmapped=$(samtools idxstats {input.bam} | awk '{{sum+=$3}}END{{print sum}}') 2> {log}
+mm=$(( $millionmapped / 1000000 )) 2>> {log}
+scalefactor=$(bc <<<"scale=5; 1 / $mm") 2>> {log}
+bedtools genomecov -ibam {input.bam} -bg > {output.bgnotscalled}.temp 2>> {log}
+bedtools sort -i {output.bgnotscalled}.temp > {output.bgnotscalled} 2>> {log}
+bedtools genomecov -ibam {input.bam} -bg -scale $scalefactor > {output.bg}.temp 2>> {log}
+bedtools sort -i {output.bg}.temp > {output.bg} 2>> {log}
+/users/mkelsey/data/tools/bedGraphToBigWig {output.bg} {params.hs1size} {output.bw} 2>> {log}
+rm {output.bg}.temp 2>> {log}
+rm {output.bgnotscalled}.temp 2>> {log}
+        """
+
+# rule deeptools_coverage_bedgraph:
+#     input:
+#         bam = "outs/{sample}/star_output/{sample}.STAR.sorted.bam",
+#         bamindex = "outs/{sample}/star_output/{sample}.STAR.sorted.bam.bai"
+#     conda:
+#         "deeptools"
+#     output:
+#         coverage = "outs/{sample}/star_output/{sample}_cov.bg"
+#     shell: "bamCoverage -b {input.bam} -o {output.coverage} --binSize 20 --outFileFormat bedgraph"
+
 
 rule deeptools_plotcoverage:
     input:
@@ -633,7 +684,7 @@ plotCoverage -b {input.bam} \
 #note that this is coverage based and therefore not adjusted for library size
 rule deeptools_plotAggcoverage:
     input:
-        coverage = "outs/{sample}/{sample}_cov.bw"
+        coverage = "outs/{sample}/star_output/{sample}_cov.bw"
     params:
         l1hs6kb = config["l1hs6kb"],
         l1hs6kbintact = config["l1hs6kbintact"]
@@ -733,6 +784,37 @@ computeMatrix reference-point \
  --plotTitle "" 2>> {log}
         """
 
+
+
+rule deeptools_plotAggcoverage2:
+    input:
+        coverageF = "outs/{sample}/star_output/{sample}_forward_BPM_cov.bw",
+        coverageR = "outs/{sample}/star_output/{sample}_reverse_BPM_cov.bw"
+    params:
+        l1hs6kb = config["l1hs6kb"],
+        l1hs6kbintact = config["l1hs6kbintact"]
+    conda:
+        "deeptools"
+    log: "logs/{sample}/deeptools_plotAggcoverage.log"
+    output:
+        matrix = "outs/{sample}/matrix_l1hs6kb_coverage.tab.gz",
+        heatmap_coverage_k3 = report("results/{sample}/plots/heatmap_coverage_k3.png", caption = "report/deeptools_plotAggcoverageheatmap_coverage_k3.rst", category="coverage"),
+        heatmap_coverage = report("results/{sample}/plots/heatmap_coverage.png", caption = "report/deeptools_plotAggcoverageheatmap_coverage.rst", category="coverage"),
+        matrixintact = "outs/{sample}/matrix_l1hs6kbintact_coverage.tab.gz",
+        heatmap_coverage_k3intact = report("results/{sample}/plots/heatmap_coverageintact_k3.png", caption = "report/deeptools_plotAggcoverageheatmap_coverageintact_k3.rst", category="coverage"),
+        heatmap_coverageintact = report("results/{sample}/plots/heatmap_coverageintact.png", caption = "report/deeptools_plotAggcoverageheatmap_coverageintact.rst", category="coverage")
+
+    shell:
+        """
+computeMatrix reference-point \
+ -S {input.coverage} \
+ -R {params.l1hs6kb} \
+ --referencePoint TSS \
+ --upstream 3000 \
+ --binSize 100 \
+ --downstream 9000 \
+ -out {output.matrix} 2> {log}
+
 #######################################################################
 #DE analysis
 #######################################################################
@@ -795,10 +877,6 @@ rule clusterprofiler:
     script:
         "scripts/clusterprofiler.R"
 
-
-
-
-
 rule gvizreduxParallel:
     input:
         sortedSTARbams = expand("outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = samples),
@@ -855,21 +933,76 @@ rule repeatanalysis:
         combinedelementContrastplot = report(expand("results/agg/repeatanalysis/{telocaltype}/{contrast}/CombinedContrastPlot.pdf", telocaltype = config["telocaltypes"], contrast = config["contrasts"]),caption = "report/repeatanalysiscombinedContrastplot.rst", category="repeat analysis"),
         DETEsbyContrast = "results/agg/repeatanalysis/allactiveDETEs.tsv",
         resultsdf = "results/agg/repeatanalysis/resultsdf.tsv",
+        sigAluYs = "results/agg/repeatanalysis/sigAluYs.tsv",
+        sigL1s = "results/agg/repeatanalysis/sigL1s.tsv",
+        sigHERVKs = "results/agg/repeatanalysis/sigHERVKs.tsv",
         outfile = "results/agg/repeatanalysis/outfile.txt"
     script:
         "scripts/repeatanalysis.R"
 
-
-rule testconda:
+rule derepeatReport:
+    input:
+        sites = "results/agg/repeatanalysis/sigL1s.tsv",
+        bedgraphs = expand("outs/{sample}/star_output/{sample}_cov.bedgraph", sample = ["NT1"]),
+        bigwigs = expand("outs/{sample}/star_output/{sample}_cov.bigwig", sample = ["NT1"]),
+        bams = expand("outs/{sample}/star_output/{sample}.STAR.sorted.bam", sample = ["NT1", "NT2", "NT3", "PRO1", "PRO2", "PRO3"]),
+        sigAluYs = "results/agg/repeatanalysis/sigAluYs.tsv",
+        sigL1s = "results/agg/repeatanalysis/sigL1s.tsv",
+        sigHERVKs = "results/agg/repeatanalysis/sigHERVKs.tsv"
+    log: "logs/agg/derepeatReport.log"
+    params:
+        peptable = "conf/private/peptable.csv",
+        refseq = config["refseq2"],
+        genes = config["genesgz"],
+        hs1fa = config["hs1sorted"],
+        l1hs6kb = config["l1hs6kbintactbed"],
+        ideogram = config["ideogram"],
+        intactl1s = config["intactl1s"],
+        repeats = config["repeats2gz"],
     conda:
-        "repeatanalysis"
+        "igvreports"
     output:
-        condatest = "condatest.txt"
+        report = "results/agg/repeatanalysis/derepeatReport.html"
     shell:
-        """
-conda env list
-        """ 
+        r"""
+echo "[" > igvjsTrackConfig.json
 
+# Get the array of input BAM file paths
+trackdata=({input.bigwigs})
+
+# Get the number of elements in the array
+n=${{#trackdata[@]}}
+
+# Loop over the elements of the array
+for i in "${{!trackdata[@]}}"; do
+  # Get the current BAM file path
+  bam="${{trackdata[$i]}}"
+
+  # Construct the JSON object for the current BAM file path
+  json="{{\"autoscaleGroup\": \"A\",
+         \"url\": \"$bam\"}}"
+
+  # Append the JSON object to the output file
+  if [[ $i -eq $((n-1)) ]]; then
+    echo "$json" >> igvjsTrackConfig.json
+  else
+    echo "$json," >> igvjsTrackConfig.json
+  fi
+done
+
+echo ] >> igvjsTrackConfig.json
+
+create_report {input.sites} \
+{params.hs1fa} \
+--ideogram {params.ideogram} \
+--sequence 1 --begin 2 --end 3 \
+--flanking 10000 \
+--tracks {params.genes} {params.repeats} \
+--track-config igvjsTrackConfig.json \
+--output {output.report} 2> {log}
+        """
+#\"format\": \"bam\",
+         
 rule repeatVariance:
     input: 
         resultsdf = "results/agg/repeatanalysis/resultsdf.tsv"
@@ -977,7 +1110,7 @@ rule evoAnalysis:
 #"results/agg/repeatanalysis/telocal_multi/condition_SEN_vs_PRO/AluY/deUP.alignment.pdf"
 rule deeptools_plotAggSignal:
     input:
-        coverage = expand("outs/{sample}/{sample}_cov.bw", sample = samples)
+        coverage = expand("outs/{sample}/star_output/{sample}_cov.bw", sample = samples)
     params:
         l1hs6kb = config["l1hs6kb"],
         aluy = config["aluY"],

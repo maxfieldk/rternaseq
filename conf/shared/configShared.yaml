@@ -5,6 +5,7 @@ trimmomaticdir: tools/Trimmomatic-0.39
 
 #genomes
 hs1sorted: "/users/mkelsey/data/ref/genomes/hs1/hs1.sorted.fa"
+hs1size: "/users/mkelsey/data/ref/genomes/hs1/hs1.chrom.sizes.txt"
 #indeces
 locindTElocal: "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd"
 telocalmapping: "/users/mkelsey/data/ref/genomes/hs1/TElocal/T2T_CHM13_v2_rmsk_TE.gtf.locInd.locations.annotated"
@@ -15,11 +16,15 @@ starindex: "/users/mkelsey/data/ref/genomes/hs1/STARindex"
 refseq: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1.110.20220412.ncbiRefSeqUCSCstyle.gtf"
 refseq2: "/users/mkelsey/data/ref/genomes/hs1/annotations2/refseq"
 genes: "/users/mkelsey/data/ref/genomes/hs1/annotations2/genes.gtf"
+genesgz: "/users/mkelsey/data/ref/genomes/hs1/annotations2/genes.sorted.gtf.gz"
+
 ideogram: "/users/mkelsey/data/ref/genomes/hs1/annotations2/Ideogram.bed"
 ideogram2: "/users/mkelsey/data/ref/genomes/hs1/annotations2/ideogramWithStain.bed"
 repeats: "/users/mkelsey/data/ref/genomes/hs1/annotations/hs1_RepeatMasker.sorted"
 repeatsbed: "/users/mkelsey/data/ref/genomes/hs1/annotations/repeatmasker.bed"
 repeats2: "/users/mkelsey/data/ref/genomes/hs1/annotations2/repeatMasker.gtf"
+repeats2gz: "/users/mkelsey/data/ref/genomes/hs1/annotations2/repeatMasker.copy.gtf.gz"
+
 repeatsannotated: "/users/mkelsey/data/ref/genomes/hs1/annotations2/repeatMaskerAnnotated.bed"
 l1hs6kb: "/users/mkelsey/data/ref/genomes/hs1/annotations/L1HS6kb"
 aluY: "/users/mkelsey/data/ref/genomes/hs1/annotations/aluY"
